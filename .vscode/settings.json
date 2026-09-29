@@ -3,17 +3,26 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.validate": ["javascript", "typescript"],
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
   },
   "material-icon-theme.files.associations": {
     "*.controller.ts": "Controller",
     "*.service.ts": "Settings",
-    "*.schema.ts": "Database"
+    "*.schema.ts": "Database",
+    "*.routes.ts": "Routing"
   },
   "material-icon-theme.folders.associations": {
-    "domains": "App",
-    "backoffice": "Admin"
+    "modules": "App",
+    "controllers": "Controller",
+    "services": "Api",
+    "schemas": "Database"
   }
 }

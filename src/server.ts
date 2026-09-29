@@ -1,22 +1,28 @@
-import { app } from "./app";
-import { envVariables } from "./config/envVariables";
-import { swaggerUiOptions } from "./config/swagger";
+import { buildApp } from "@/app";
+import { env } from "@/config/env";
+import { swaggerUiOptions } from "@/config/swagger";
 
-const PORT = envVariables.PORT;
-const HOST = "0.0.0.0";
-const LOCALHOST = "localhost";
+const app = buildApp();
 
-async function startServer() {
+async function shutdown(signal: NodeJS.Signals): Promise<void> {
+  app.log.info(`${signal} recebido, encerrando...`);
+
   try {
-    await app.listen({ port: PORT, host: HOST });
-
-    console.info(`\n\n🚀 Server is running at http://${LOCALHOST}:${PORT}`);
-    console.info(`📚 Documentation http://${LOCALHOST}:${PORT}${swaggerUiOptions.routePrefix}\n`);
+    await app.close();
+    process.exit(0);
   } catch (error) {
-    app.log.error(error);
-    console.error(error);
+    app.log.error(error, "Falha ao encerrar");
     process.exit(1);
   }
 }
 
-void startServer();
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
+
+try {
+  await app.listen({ port: env.PORT, host: "0.0.0.0" });
+  app.log.info(`Documentação em http://localhost:${env.PORT}${swaggerUiOptions.routePrefix}`);
+} catch (error) {
+  app.log.error(error, "Falha ao subir o servidor");
+  process.exit(1);
+}

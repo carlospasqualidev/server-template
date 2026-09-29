@@ -1,42 +1,55 @@
-import Fastify from "fastify";
-import helmet from "@fastify/helmet";
-import cors from "@fastify/cors";
+import "@/lib/validation/locale";
+
 import cookie from "@fastify/cookie";
-import multipart, { ajvFilePlugin } from "@fastify/multipart";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import multipart from "@fastify/multipart";
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import { MAX_UPLOAD_FILES, MAX_UPLOAD_FILE_SIZE_IN_BYTES } from "./api/domains/client/upload/utils/upload.constants";
-import { corsOptions } from "./config/corsOptions";
-import { swaggerOptions, swaggerUiOptions } from "./config/swagger";
-import { errorHandler } from "./api/utils/error";
-import { routes } from "./api/routes";
+import Fastify from "fastify";
+import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 
-export function buildApp() {
-  const app = Fastify({
-    ajv: {
-      plugins: [ajvFilePlugin as any],
-    } as any,
-  });
+import { MAX_UPLOAD_FILE_SIZE_IN_BYTES } from "@/config/constants";
+import { corsOptions } from "@/config/cors";
+import { buildLoggerOptions } from "@/config/logger";
+import { swaggerOptions, swaggerUiOptions } from "@/config/swagger";
+import { errorHandler, notFoundHandler } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { healthRoutes } from "@/modules/health/health.routes";
+import { type ApiRoutesOptions, apiRoutes } from "@/routes";
+
+export type BuildAppOptions = ApiRoutesOptions;
+
+/** Monta a aplicação sem escutar porta. `server.ts` sobe o HTTP; os testes usam `app.inject()`. */
+export function buildApp(options: BuildAppOptions = {}) {
+  const app = Fastify({ logger: buildLoggerOptions() }).withTypeProvider<ZodTypeProvider>();
+
+  // Zod valida request e serializa response a partir dos schemas das rotas.
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
 
   app.decorateRequest("user", null);
 
   app.register(helmet);
   app.register(cors, corsOptions);
   app.register(cookie);
-  app.register(multipart, {
-    limits: {
-      fileSize: MAX_UPLOAD_FILE_SIZE_IN_BYTES,
-      files: MAX_UPLOAD_FILES,
-    },
-    throwFileSizeLimit: true,
-  });
+  app.register(rateLimit, { global: false });
+  app.register(multipart, { limits: { fileSize: MAX_UPLOAD_FILE_SIZE_IN_BYTES, files: 1 }, throwFileSizeLimit: true });
   app.register(swagger, swaggerOptions);
+  app.register(swaggerUi, swaggerUiOptions);
 
   app.setErrorHandler(errorHandler);
-  app.register(routes, { prefix: "/api" });
-  app.register(swaggerUi, swaggerUiOptions);
+  app.setNotFoundHandler(notFoundHandler);
+
+  app.register(healthRoutes, { prefix: "/health" });
+  app.register(apiRoutes, { prefix: "/api", loginRateLimitMax: options.loginRateLimitMax });
+
+  app.addHook("onClose", async () => {
+    await prisma.$disconnect();
+  });
 
   return app;
 }
 
-export const app = buildApp();
+export type App = ReturnType<typeof buildApp>;

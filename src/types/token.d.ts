@@ -1,6 +1,2 @@
-// Tipagem do payload do token JWT.
-export interface IToken {
-  user: {
-    id: string;
-  };
-}
+// Substituido por `src/lib/auth/session.ts`. Arquivo mantido vazio ate ser apagado.
+export {};

@@ -1,4 +1,4 @@
-import "dotenv/config"; // Não remover esse import.
+import "dotenv/config"; // Carrega o .env para o CLI do Prisma. Nao remover.
 import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({

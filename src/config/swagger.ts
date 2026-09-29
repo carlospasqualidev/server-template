@@ -1,49 +1,41 @@
-import type { FastifyDynamicSwaggerOptions } from "@fastify/swagger";
-import type { FastifySwaggerUiOptions } from "@fastify/swagger-ui";
-import { envVariables } from "./envVariables";
+import { type FastifyDynamicSwaggerOptions } from "@fastify/swagger";
+import { type FastifySwaggerUiOptions } from "@fastify/swagger-ui";
+import { jsonSchemaTransform, jsonSchemaTransformObject } from "fastify-type-provider-zod";
 
+import { SESSION_COOKIE_NAME } from "@/config/constants";
+import { env } from "@/config/env";
+
+/** Toda tag usada em `tags:` de um schema de rota precisa estar registrada aqui, com descrição. */
 const tags: { name: string; description: string }[] = [
-  {
-    name: "Session",
-    description: "Autenticação e controle de sessão.",
-  },
-  {
-    name: "Upload",
-    description: "Operações de envio de arquivos.",
-  },
-  {
-    name: "Users",
-    description: "Operações relacionadas aos usuários.",
-  },
+  { name: "Health", description: "Disponibilidade da API e do banco." },
+  { name: "Session", description: "Autenticação e controle de sessão." },
+  { name: "Users", description: "Usuários da empresa do usuário autenticado." },
+  { name: "Upload", description: "Envio de arquivos para o storage." },
 ];
 
 export const swaggerOptions: FastifyDynamicSwaggerOptions = {
-  mode: "dynamic",
   openapi: {
     openapi: "3.1.0",
     info: {
-      title: `${envVariables.PROJECT_NAME} API`,
-      description: "Documentação automática da API gerada a partir das rotas Fastify.",
+      title: `${env.PROJECT_NAME} API`,
+      description: "Documentação gerada a partir dos schemas Zod das rotas.",
       version: "1.0.0",
     },
-    servers: [
-      {
-        url: `http://localhost:${envVariables.PORT}`,
-        description: "Ambiente local",
-      },
-    ],
+    servers: [{ url: `http://localhost:${env.PORT}`, description: "Ambiente local" }],
     tags,
     components: {
       securitySchemes: {
         cookieAuth: {
           type: "apiKey",
           in: "cookie",
-          name: "token",
-          description: "JWT enviado no cookie HTTP-only `token`.",
+          name: SESSION_COOKIE_NAME,
+          description: `JWT enviado no cookie HTTP-only \`${SESSION_COOKIE_NAME}\`. Faça login pelo próprio Swagger para testar as rotas protegidas.`,
         },
       },
     },
   },
+  transform: jsonSchemaTransform,
+  transformObject: jsonSchemaTransformObject,
 };
 
 export const swaggerUiOptions: FastifySwaggerUiOptions = {

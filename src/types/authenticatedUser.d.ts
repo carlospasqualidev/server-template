@@ -1,5 +1,2 @@
-export interface AuthenticatedUser {
-  id: string;
-  name: string;
-  email: string;
-}
+// Substituido por `src/lib/auth/authenticatedUser.ts`. Arquivo mantido vazio ate ser apagado.
+export {};

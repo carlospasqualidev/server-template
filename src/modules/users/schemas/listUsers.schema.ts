@@ -1,0 +1,32 @@
+import { z } from "zod";
+
+import { paginationQuerySchema, sortQuerySchema } from "@/lib/http/pagination";
+import { booleanQuerySchema, searchQuerySchema } from "@/lib/http/query";
+import { errorResponseSchema } from "@/lib/http/responses";
+import { userSchema } from "@/modules/users/schemas/user.schemas";
+
+/** Allowlist de ordenação: só estes campos chegam ao `orderBy` do Prisma. */
+export const USER_SORT_FIELDS = ["name", "email", "createdAt"] as const;
+
+export const listUsersQuerySchema = paginationQuerySchema
+  .extend(sortQuerySchema(USER_SORT_FIELDS, { orderBy: "name", order: "asc" }).shape)
+  .extend({
+    search: searchQuerySchema.describe("Busca por nome ou e-mail (contém, sem diferenciar maiúsculas)."),
+    isActive: booleanQuerySchema.describe("Filtra por status: true (ativos) ou false (bloqueados)."),
+  });
+
+export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+
+export const listUsersResponseSchema = z.object({
+  users: z.array(userSchema),
+  count: z.number().int().describe("Total de registros que atendem ao filtro (para paginação)."),
+});
+
+export const listUsersRouteSchema = {
+  tags: ["Users"],
+  summary: "Lista os usuários da empresa",
+  description: "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado.",
+  security: [{ cookieAuth: [] }],
+  querystring: listUsersQuerySchema,
+  response: { 200: listUsersResponseSchema, 400: errorResponseSchema, 401: errorResponseSchema },
+};
