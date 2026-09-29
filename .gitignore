@@ -10,3 +10,4 @@ src/generated
 *.log
 .DS_Store
 .vitest
+docs/mapa/
