@@ -25,8 +25,14 @@ export const listUsersResponseSchema = z.object({
 export const listUsersRouteSchema = {
   tags: ["Users"],
   summary: "Lista os usuários da empresa",
-  description: "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado.",
+  description:
+    "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado. Exige `backoffice.users.read`.",
   security: [{ cookieAuth: [] }],
   querystring: listUsersQuerySchema,
-  response: { 200: listUsersResponseSchema, 400: errorResponseSchema, 401: errorResponseSchema },
+  response: {
+    200: listUsersResponseSchema,
+    400: errorResponseSchema,
+    401: errorResponseSchema,
+    403: errorResponseSchema,
+  },
 };

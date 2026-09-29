@@ -9,6 +9,11 @@ export interface AuthenticatedUser {
   email: string;
   /** Tenant. Todo service que lê ou escreve dado de negócio recebe e filtra por este id. */
   companyId: string;
+  /**
+   * Permissões efetivas (união dos cargos não excluídos), relidas do banco a cada requisição, em ordem alfabética.
+   * Checadas por `requirePermission` / `requireAnyPermission` (`@/hooks/requirePermission`).
+   */
+  permissions: string[];
 }
 
 /** Use nos controllers de rotas protegidas: devolve `request.user` já estreitado (nunca `null`). */

@@ -24,6 +24,7 @@ model Company {
   deletedAt DateTime?
 
   users User[]
+  roles Role[]
 
   @@index([deletedAt])
   @@map("companies")
@@ -43,9 +44,82 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  company Company @relation(fields: [companyId], references: [id])
+  company   Company    @relation(fields: [companyId], references: [id])
+  userRoles UserRole[]
 
   @@index([companyId])
   @@index([deletedAt])
   @@map("users")
+}
+
+/// Permissao do catalogo, global (igual para todas as empresas). A fonte e `src/modules/permissions/permission.catalog.ts`,
+/// sincronizada por `syncPermissionCatalogService`; nao se cria permissao pela API. `name` e a chave estavel usada no
+/// codigo (`backoffice.users.read`); `module`, `groupLabel`, `action`, `label` e `sortOrder` alimentam a tela de cargos.
+model Permission {
+  id         String   @id @default(uuid(7))
+  name       String   @unique
+  module     String
+  groupLabel String
+  action     String
+  label      String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+/// Cargo de uma empresa: conjunto de permissoes atribuido a usuarios. Toda empresa tem o cargo de sistema
+/// `Administrador` (`isSystem`), com o catalogo inteiro. `name` e unico na empresa mesmo apos exclusao logica.
+/// O indice unico `[companyId, name]` tambem atende as consultas por `companyId`.
+model Role {
+  id          String    @id @default(uuid(7))
+  companyId   String
+  name        String
+  description String?
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([companyId, name])
+  @@index([deletedAt])
+  @@map("roles")
+}
+
+/// Permissao concedida a um cargo. O indice unico `[roleId, permissionId]` tambem atende as consultas por `roleId`.
+model RolePermission {
+  id           String   @id @default(uuid(7))
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+/// Cargo atribuido a um usuario (um usuario pode ter varios). As permissoes efetivas sao a uniao dos cargos nao
+/// excluidos. O indice unico `[userId, roleId]` tambem atende as consultas por `userId`.
+model UserRole {
+  id        String   @id @default(uuid(7))
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
 }

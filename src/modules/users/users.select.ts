@@ -12,7 +12,7 @@ export const userSelect = {
   updatedAt: true,
 } satisfies Prisma.UserSelect;
 
-/** Colunas devolvidas na sessão (login, register, /me). Espelha `userSummarySchema`. */
+/** Colunas devolvidas na sessão (login, register, /me). `userSummarySchema` soma a elas as `permissions` efetivas. */
 export const userSummarySelect = {
   id: true,
   name: true,

@@ -4,7 +4,8 @@ import { type App } from "@/app";
 import { verifyPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/prisma";
 import { createTestApp } from "@/tests/helpers/app";
-import { createUser } from "@/tests/helpers/factories";
+import { raceAgainstAdminChange } from "@/tests/helpers/companyAdminsLock";
+import { createUser, findAdminRole } from "@/tests/helpers/factories";
 import { sessionCookiesFor } from "@/tests/helpers/session";
 
 const USERS_URL = "/api/client/users";
@@ -71,6 +72,155 @@ describe("PATCH /api/client/users/:userId", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().user).toMatchObject({ phone: null, image: null });
+  });
+
+  describe("último administrador ativo da empresa", () => {
+    const LAST_ADMIN_MESSAGE = "Não é possível bloquear o último administrador ativo da empresa.";
+
+    it("não é bloqueado por quem tem users.update e responde 400", async () => {
+      const admin = await createUser();
+      const manager = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.update"] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(manager.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: LAST_ADMIN_MESSAGE });
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: admin.id } })).isActive).toBe(true);
+    });
+
+    it("não bloqueia a si mesmo", async () => {
+      const admin = await createUser();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: LAST_ADMIN_MESSAGE });
+    });
+
+    it("administrador bloqueado e administrador de outra empresa não contam", async () => {
+      const admin = await createUser();
+      await createUser({ companyId: admin.companyId, isActive: false });
+      await createUser();
+      const manager = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.update"] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(manager.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("administrador excluído logicamente não conta", async () => {
+      const admin = await createUser();
+      await createUser({ companyId: admin.companyId, deletedAt: new Date() });
+      const manager = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.update"] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(manager.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: LAST_ADMIN_MESSAGE });
+    });
+
+    it("com o cargo Administrador excluído, quem o tinha não conta como administrador", async () => {
+      const admin = await createUser();
+      await prisma.role.update({
+        where: { id: (await findAdminRole(admin.companyId)).id },
+        data: { deletedAt: new Date() },
+      });
+      const manager = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.update"] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(manager.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user.isActive).toBe(false);
+    });
+
+    it("espera quem bloqueia o outro administrador ao mesmo tempo e responde 400", async () => {
+      const admin = await createUser();
+      const otherAdmin = await createUser({ companyId: admin.companyId });
+      const manager = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.update"] });
+
+      const response = await raceAgainstAdminChange({
+        companyId: admin.companyId,
+        lockedWrite: (tx) => tx.user.update({ where: { id: otherAdmin.id }, data: { isActive: false } }),
+        operation: () =>
+          app.inject({
+            method: "PATCH",
+            url: `${USERS_URL}/${admin.id}`,
+            cookies: sessionCookiesFor(manager.id),
+            payload: { isActive: false },
+          }),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: LAST_ADMIN_MESSAGE });
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: admin.id } })).isActive).toBe(true);
+    });
+
+    it("é bloqueado quando há outro administrador ativo na empresa", async () => {
+      const admin = await createUser();
+      const otherAdmin = await createUser({ companyId: admin.companyId });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${otherAdmin.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user.isActive).toBe(false);
+    });
+
+    it("segue editável nos outros campos", async () => {
+      const admin = await createUser();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${admin.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { name: "Novo nome", isActive: true },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
+
+    it("não impede bloquear quem não é administrador", async () => {
+      const admin = await createUser();
+      const member = await createUser({ companyId: admin.companyId, permissions: ["backoffice.users.read"] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${member.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { isActive: false },
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
   });
 
   it("usuário de outra empresa responde 404", async () => {

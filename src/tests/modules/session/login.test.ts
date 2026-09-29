@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type App } from "@/app";
+import { prisma } from "@/lib/prisma";
+import { PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
-import { createUser, DEFAULT_PASSWORD } from "@/tests/helpers/factories";
+import { createRole, createUser, DEFAULT_PASSWORD } from "@/tests/helpers/factories";
 
 const LOGIN_URL = "/api/client/session/login";
 
@@ -10,7 +12,8 @@ describe("POST /api/client/session/login", () => {
   let app: App;
 
   beforeAll(async () => {
-    app = await createTestApp();
+    // Este arquivo faz mais logins que o limite padrão por minuto; o 429 é testado num app próprio, no fim.
+    app = await createTestApp({ loginRateLimitMax: 100 });
   });
 
   afterAll(async () => {
@@ -29,12 +32,57 @@ describe("POST /api/client/session/login", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       success: true,
-      user: { id: user.id, name: "Maria", email: "maria@example.com", image: null },
+      user: {
+        id: user.id,
+        name: "Maria",
+        email: "maria@example.com",
+        image: null,
+        permissions: [...PERMISSION_NAMES].toSorted(),
+      },
     });
 
     const cookie = response.cookies.find((item) => item.name === "token");
     expect(cookie).toMatchObject({ httpOnly: true, path: "/", sameSite: "Lax" });
     expect(cookie?.value).toBeTruthy();
+  });
+
+  it("devolve só as permissões dos cargos do usuário, achatadas e ordenadas", async () => {
+    await createUser({
+      email: "leitor@example.com",
+      permissions: ["backoffice.users.update", "backoffice.users.read"],
+    });
+    await createUser({ email: "sem-cargo@example.com", permissions: [] });
+
+    const reader = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      payload: { email: "leitor@example.com", password: DEFAULT_PASSWORD },
+    });
+    const withoutRole = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      payload: { email: "sem-cargo@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(reader.statusCode).toBe(200);
+    expect(reader.json().user.permissions).toEqual(["backoffice.users.read", "backoffice.users.update"]);
+    expect(withoutRole.statusCode).toBe(200);
+    expect(withoutRole.json().user.permissions).toEqual([]);
+  });
+
+  it("ignora vínculo com cargo de outra empresa gravado direto no banco", async () => {
+    const user = await createUser({ email: "vinculo@example.com", permissions: ["backoffice.users.read"] });
+    const foreignRole = await createRole({ permissions: ["backoffice.users.delete"] });
+    await prisma.userRole.create({ data: { userId: user.id, roleId: foreignRole.id } });
+
+    const response = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      payload: { email: "vinculo@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.permissions).toEqual(["backoffice.users.read"]);
   });
 
   it("não vaza o hash da senha na resposta", async () => {

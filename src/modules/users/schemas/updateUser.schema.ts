@@ -33,6 +33,8 @@ export const updateUserResponseSchema = z.object({
 export const updateUserRouteSchema = {
   tags: ["Users"],
   summary: "Atualiza um usuário",
+  description:
+    "Exige `backoffice.users.update`. Bloquear (`isActive: false`) o último administrador ativo da empresa responde 400.",
   security: [{ cookieAuth: [] }],
   params: userParamsSchema,
   body: updateUserBodySchema,
@@ -40,6 +42,7 @@ export const updateUserRouteSchema = {
     200: updateUserResponseSchema,
     400: errorResponseSchema,
     401: errorResponseSchema,
+    403: errorResponseSchema,
     404: errorResponseSchema,
   },
 };

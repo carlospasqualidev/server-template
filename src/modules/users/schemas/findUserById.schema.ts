@@ -10,12 +10,14 @@ export const findUserByIdResponseSchema = z.object({
 export const findUserByIdRouteSchema = {
   tags: ["Users"],
   summary: "Busca um usuário por ID",
+  description: "Exige `backoffice.users.read`.",
   security: [{ cookieAuth: [] }],
   params: userParamsSchema,
   response: {
     200: findUserByIdResponseSchema,
     400: errorResponseSchema,
     401: errorResponseSchema,
+    403: errorResponseSchema,
     404: errorResponseSchema,
   },
 };

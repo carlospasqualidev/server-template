@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type App } from "@/app";
 import { prisma } from "@/lib/prisma";
+import { PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
 import { createUser } from "@/tests/helpers/factories";
 
@@ -28,13 +29,48 @@ describe("POST /api/client/session/register", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({
       success: true,
-      user: { id: expect.any(String), name: "Carla", email: "carla@example.com", image: null },
+      user: {
+        id: expect.any(String),
+        name: "Carla",
+        email: "carla@example.com",
+        image: null,
+        permissions: [...PERMISSION_NAMES].toSorted(),
+      },
     });
     expect(response.cookies.find((cookie) => cookie.name === "token")?.value).toBeTruthy();
 
     const created = await prisma.user.findUnique({ where: { email: "carla@example.com" }, include: { company: true } });
     expect(created?.company.name).toBe("Empresa de Carla");
     expect(created?.password).not.toBe("senha-forte-1");
+  });
+
+  it("cria o cargo de sistema Administrador da empresa, com o catálogo inteiro, e vincula o usuário", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: REGISTER_URL,
+      payload: { name: "Dora", email: "dora@example.com", password: "senha-forte-1" },
+    });
+
+    expect(response.statusCode).toBe(201);
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: "dora@example.com" } });
+    const roles = await prisma.role.findMany({
+      where: { companyId: user.companyId },
+      select: {
+        name: true,
+        isSystem: true,
+        deletedAt: true,
+        rolePermissions: { select: { permission: { select: { name: true } } } },
+        userRoles: { select: { userId: true } },
+      },
+    });
+
+    expect(roles).toHaveLength(1);
+    expect(roles[0]).toMatchObject({ name: "Administrador", isSystem: true, deletedAt: null });
+    expect(roles[0]?.rolePermissions.map((item) => item.permission.name).toSorted()).toEqual(
+      [...PERMISSION_NAMES].toSorted(),
+    );
+    expect(roles[0]?.userRoles).toEqual([{ userId: user.id }]);
   });
 
   it("e-mail já cadastrado responde 409", async () => {

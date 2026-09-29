@@ -142,7 +142,7 @@
         "tags": [
           "Session"
         ],
-        "description": "Valida as credenciais e grava o cookie HTTP-only de sessão.",
+        "description": "Valida as credenciais, grava o cookie HTTP-only de sessão e devolve o usuário com as permissões efetivas.",
         "requestBody": {
           "required": true,
           "content": {
@@ -207,13 +207,25 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Permissões efetivas (união dos cargos do usuário), em ordem alfabética. O frontend decide menu e botões por `includes`; o backend é quem autoriza.",
+                          "example": [
+                            "backoffice.users.create",
+                            "backoffice.users.read"
+                          ]
                         }
                       },
                       "required": [
                         "id",
                         "name",
                         "email",
-                        "image"
+                        "image",
+                        "permissions"
                       ],
                       "additionalProperties": false
                     }
@@ -408,7 +420,7 @@
         "tags": [
           "Session"
         ],
-        "description": "Cria a empresa do usuário e o próprio usuário, e grava o cookie de sessão.",
+        "description": "Cria a empresa, o cargo `Administrador` dela (catálogo inteiro de permissões) e o usuário vinculado a esse cargo, e grava o cookie de sessão.",
         "requestBody": {
           "required": true,
           "content": {
@@ -479,13 +491,25 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Permissões efetivas (união dos cargos do usuário), em ordem alfabética. O frontend decide menu e botões por `includes`; o backend é quem autoriza.",
+                          "example": [
+                            "backoffice.users.create",
+                            "backoffice.users.read"
+                          ]
                         }
                       },
                       "required": [
                         "id",
                         "name",
                         "email",
-                        "image"
+                        "image",
+                        "permissions"
                       ],
                       "additionalProperties": false
                     }
@@ -627,7 +651,7 @@
         "tags": [
           "Users"
         ],
-        "description": "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado.",
+        "description": "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado. Exige `backoffice.users.read`.",
         "parameters": [
           {
             "schema": {
@@ -877,6 +901,49 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           }
         }
       },
@@ -885,6 +952,7 @@
         "tags": [
           "Users"
         ],
+        "description": "Exige `backoffice.users.create`. O usuário nasce sem cargo.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1115,6 +1183,49 @@
               }
             }
           },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "409": {
             "description": "Default Response",
             "content": {
@@ -1167,7 +1278,7 @@
         "tags": [
           "Users"
         ],
-        "description": "Valida a sessão e devolve o usuário autenticado. O frontend chama ao carregar.",
+        "description": "Valida a sessão e devolve o usuário autenticado com as permissões efetivas. Só exige sessão. O frontend chama ao carregar.",
         "security": [
           {
             "cookieAuth": []
@@ -1202,13 +1313,25 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Permissões efetivas (união dos cargos do usuário), em ordem alfabética. O frontend decide menu e botões por `includes`; o backend é quem autoriza.",
+                          "example": [
+                            "backoffice.users.create",
+                            "backoffice.users.read"
+                          ]
                         }
                       },
                       "required": [
                         "id",
                         "name",
                         "email",
-                        "image"
+                        "image",
+                        "permissions"
                       ],
                       "additionalProperties": false
                     }
@@ -1273,6 +1396,7 @@
         "tags": [
           "Users"
         ],
+        "description": "Exige `backoffice.users.read`.",
         "parameters": [
           {
             "schema": {
@@ -1448,6 +1572,49 @@
               }
             }
           },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "404": {
             "description": "Default Response",
             "content": {
@@ -1498,6 +1665,7 @@
         "tags": [
           "Users"
         ],
+        "description": "Exige `backoffice.users.update`. Bloquear (`isActive: false`) o último administrador ativo da empresa responde 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1733,6 +1901,49 @@
               }
             }
           },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "404": {
             "description": "Default Response",
             "content": {
@@ -1783,6 +1994,7 @@
         "tags": [
           "Users"
         ],
+        "description": "Exige `backoffice.users.delete`. Excluir o próprio usuário ou o último administrador ativo da empresa responde 400.",
         "parameters": [
           {
             "schema": {
@@ -1866,6 +2078,49 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
             "description": "Default Response",
             "content": {
               "application/json": {

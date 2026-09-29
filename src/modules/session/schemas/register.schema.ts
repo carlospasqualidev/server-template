@@ -20,7 +20,8 @@ export const registerResponseSchema = z.object({
 export const registerRouteSchema = {
   tags: ["Session"],
   summary: "Cria uma conta e inicia a sessão",
-  description: "Cria a empresa do usuário e o próprio usuário, e grava o cookie de sessão.",
+  description:
+    "Cria a empresa, o cargo `Administrador` dela (catálogo inteiro de permissões) e o usuário vinculado a esse cargo, e grava o cookie de sessão.",
   body: registerBodySchema,
   response: {
     201: registerResponseSchema,

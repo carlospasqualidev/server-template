@@ -58,6 +58,24 @@ describe("POST /api/client/upload/file", () => {
     expect(putCalls[0]?.args[0].input).toMatchObject({ Bucket: "test-bucket", ContentType: "application/pdf" });
   });
 
+  it("só exige sessão: usuário sem cargo também envia", async () => {
+    s3Mock.on(PutObjectCommand).resolves({});
+    const user = await createUser({ permissions: [] });
+    const { payload, contentType } = buildMultipartBody([
+      { fieldName: "file", fileName: "foto.png", contentType: "image/png", content: "png" },
+    ]);
+
+    const response = await app.inject({
+      method: "POST",
+      url: UPLOAD_URL,
+      cookies: sessionCookiesFor(user.id),
+      headers: { "content-type": contentType },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(201);
+  });
+
   it("sem arquivo no campo file responde 400", async () => {
     const user = await createUser();
     const { payload, contentType } = buildMultipartBody([

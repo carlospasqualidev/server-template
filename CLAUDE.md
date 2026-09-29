@@ -155,6 +155,7 @@ Regras práticas:
 - `select` explícito em toda consulta (ver `users.select.ts`). Nunca `include` cego nem devolver a linha inteira.
 - `prisma.$transaction([findMany, count])` para lista + total numa ida só.
 - **Índices**: toda FK e todo `deletedAt` têm `@@index` no schema. Campo novo usado em `where`/`orderBy` frequente ganha índice na mesma migration.
+  - Exceção: **FK que é prefixo (primeira coluna) de um `@@unique` ou `@@index` composto dispensa índice próprio**, porque o composto já atende a busca por ela. Ex.: `Role.companyId` coberto por `@@unique([companyId, name])`, `UserRole.userId` por `@@unique([userId, roleId])`. A FK que não é a primeira coluna (`UserRole.roleId`) continua com `@@index` próprio. Registre no comentário do model qual índice cobre a FK.
 - Upload é stream (arquivo → S3) sem passar por memória ou disco. Mantenha.
 - Custo do bcrypt cai para 4 em teste (`env.isTest`), não mexa em produção.
 
@@ -164,25 +165,29 @@ Regras práticas:
 
 Uma camada só: **integração real** com Vitest + `app.inject()` contra um Postgres descartável. Sem mock de banco, sem porta HTTP, sem Docker dentro do teste.
 
-- Banco de teste: `server_template_test` (criado pelo `docker compose` e, se faltar, pelo `globalSetup`). O `globalSetup` **recusa** rodar contra banco cujo nome não termine em `_test`, porque cada teste começa com `TRUNCATE` (ver `src/tests/setup.ts`). **Tabela nova entra na lista do `TRUNCATE`.**
+- Banco de teste: `server_template_test` (criado pelo `docker compose` e, se faltar, pelo `globalSetup`). O `globalSetup` **recusa** rodar contra banco cujo nome não termine em `_test`, porque cada teste começa com `TRUNCATE` (ver `src/tests/setup.ts`). **Tabela nova entra na lista do `TRUNCATE`.** Depois do `TRUNCATE`, o `setup.ts` roda `syncPermissionCatalogService()`: todo teste começa com o catálogo de permissões no banco.
 - Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local, exceto pelo endereço do banco, derivado do `DATABASE_URL` do arquivo `.env` (mesmo servidor, banco `server_template_test`). `TEST_DATABASE_URL` sobrescreve (CI). O `DATABASE_URL` do shell é ignorado de propósito.
 - Todos os testes vivem em [`src/tests/`](src/tests), importados via alias `@/`:
 
 ```
 src/tests/
-├── setup.ts                       # TRUNCATE antes de cada teste, $disconnect no fim
+├── setup.ts                       # TRUNCATE + sincronização do catálogo de permissões antes de cada teste, $disconnect no fim
 ├── globalSetup.ts                 # cria o banco de teste e roda migrate deploy
 ├── testEnv.ts
 ├── helpers/
 │   ├── app.ts                     # createTestApp(options) → app pronto para inject()
 │   ├── session.ts                 # sessionCookiesFor(userId) → cookie válido sem passar pelo login
-│   ├── factories.ts               # createCompany(), createUser({...})
+│   ├── factories.ts               # createCompany(), createRole({...}), findAdminRole(companyId), createUser({...})
+│   ├── companyAdminsLock.ts       # raceAgainstAdminChange({...}) → corrida do último administrador, determinística
 │   └── multipart.ts               # buildMultipartBody([...]) para upload
 ├── modules/<módulo>/<endpoint>.test.ts
+├── hooks/<hook>.test.ts
 └── lib/<grupo>/<arquivo>.test.ts
 ```
 
-- **Todo endpoint novo tem teste** cobrindo: happy path (status + shape da resposta), validação (400 com `issues`), sem sessão (401), registro de outra empresa (404) e cada regra de negócio (409, 403, mensagem). Filtro e ordenação exigem **dado**: semeie registros que entram e que ficam de fora e asserte os dois lados.
+- **Permissões nos testes**: `createCompany()` cria a empresa com o cargo `Administrador` (como o register). `createUser()` sem `permissions` recebe esse cargo, com o catálogo inteiro; `permissions: []` cria o usuário sem cargo; `permissions: ["backoffice.users.read"]` cria um cargo só com essas; `roleIds` vincula cargos já criados (`createRole`). Teste de 403 usa um usuário com todas as permissões menos a exigida.
+
+- **Todo endpoint novo tem teste** cobrindo: happy path (status + shape da resposta), validação (400 com `issues`), sem sessão (401), sem a permissão exigida (403), registro de outra empresa (404) e cada regra de negócio (409, 403, mensagem). Filtro e ordenação exigem **dado**: semeie registros que entram e que ficam de fora e asserte os dois lados.
 - Teste o caminho de falha, não só o feliz. Asserte a mensagem pt-BR: ela é contrato com o frontend.
 - S3 é mockado com `aws-sdk-client-mock` (`mockClient(S3Client)`); nenhum teste faz rede.
 - Factories em `helpers/factories.ts`; não escreva `prisma.user.create` gigante inline.
@@ -210,14 +215,15 @@ Ao terminar **qualquer** tarefa que toque `src/`, rode `npm run check` (lint + t
 ```
 src/
 ├── app.ts                  # buildApp(): plugins, compiladores Zod, error handler, rotas. Sem listen.
-├── server.ts               # listen + graceful shutdown (SIGINT/SIGTERM)
+├── server.ts               # sincroniza o catálogo de permissões, listen + graceful shutdown (SIGINT/SIGTERM)
 ├── routes.ts               # árvore /api → /client → módulos; grupo protegido com requireSession
 ├── config/
 │   ├── env.ts              # ÚNICO lugar que lê process.env, validado com Zod
 │   ├── constants.ts        # cookie, paginação, limites, rate limit
 │   ├── cors.ts · logger.ts · swagger.ts
 ├── hooks/
-│   └── requireSession.ts   # onRequest das rotas protegidas: cookie → JWT → usuário → request.user
+│   ├── requireSession.ts   # onRequest das rotas protegidas: cookie → JWT → usuário + permissões → request.user
+│   └── requirePermission.ts # preHandler por rota: requirePermission(nome) / requireAnyPermission([nomes]) → 403
 ├── lib/                    # infraestrutura compartilhada; NÃO importa de modules/
 │   ├── prisma.ts           # client único + `notDeleted`
 │   ├── errors/             # AppError e filhos, assertExists, errorHandler, reportError
@@ -240,7 +246,7 @@ scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
 docs/openapi.json           # contrato gerado; commitado
 ```
 
-Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3).
+Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, invariante do último administrador e a trava dela; sem rotas).
 
 ---
 
@@ -257,14 +263,14 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 
 | Camada        | Pode importar                                   | Não pode                                 |
 | ------------- | ----------------------------------------------- | ---------------------------------------- |
-| `*.routes.ts` | controllers, schemas do próprio módulo, config  | `@/lib/prisma`, services                 |
+| `*.routes.ts` | controllers, schemas do próprio módulo, `@/hooks/*` (`requirePermission`), config | `@/lib/prisma`, services |
 | `controllers` | services, schemas (tipos), `@/lib/*`, config    | `@/lib/prisma`                           |
 | `services`    | `@/lib/prisma`, `@/lib/*`, schemas (tipos), services de outros módulos | controllers, `reply`      |
 | `schemas`     | `zod`, `@/lib/http`, `@/lib/validation`, schemas de outros módulos | `@/lib/prisma`, services |
-| `hooks`       | services, `@/lib/*`                             | `@/lib/prisma`                           |
+| `hooks`       | services, `@/lib/*`, `permission.catalog` (tipos) | `@/lib/prisma`                         |
 | `lib`, `config` | `@/lib/*`, `@/config/*`, `@/generated`        | `@/modules/*`                            |
 
-Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro.
+Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro. O módulo `permissions` expõe também `permission.catalog.ts` (catálogo, `PermissionName`, `ADMIN_ROLE`) e `permissions.select.ts` (`effectivePermissionsSelect({ userId } | { companyId })` + `toPermissionNames`, para ler usuário e permissões na mesma consulta).
 
 ### Anatomia de um endpoint — checklist para criar um novo
 
@@ -274,14 +280,14 @@ Exemplo: `PATCH /api/client/users/:userId`.
    - `xxxBodySchema` / `xxxQuerySchema` / `xxxParamsSchema` compondo primitivos de `@/lib/validation/schemas` e helpers de `@/lib/http`. `describe()` em cada campo, mensagens pt-BR.
    - `export type XxxBody = z.infer<typeof xxxBodySchema>`.
    - `xxxResponseSchema` com o shape exato da resposta (campos extras são descartados na serialização; `Date` do Prisma usa `dateTimeOutputSchema`).
-   - `xxxRouteSchema = { tags, summary, description, security: [{ cookieAuth: [] }] (se protegida), body/querystring/params, response: { 200/201, 400, 401, 404, 409... : errorResponseSchema } }`.
+   - `xxxRouteSchema = { tags, summary, description, security: [{ cookieAuth: [] }] (se protegida), body/querystring/params, response: { 200/201, 400, 401, 403, 404, 409... : errorResponseSchema } }`. Rota com permissão cita a exigida na `description` (``"Exige `backoffice.users.read`."``) e declara o 403.
 2. **Service** — `services/<verboEntidade>.service.ts`: recebe `{ companyId, ...dados }`, aplica regra, fala com o Prisma (`select` explícito, `...notDeleted`), lança `AppError`, devolve o dado. Sem `request`/`reply`.
 3. **Controller** — `controllers/<verboEntidade>.controller.ts`: `getAuthenticatedUser(request)`, chama o service, `reply.status(N).send(...)`. Nada de regra aqui.
-4. **Rota** — em `<módulo>.routes.ts`: `app.patch("/:userId", { schema: xxxRouteSchema }, xxxController)`. Rotas com parâmetro por último. Rota raiz (`"/"`) com `prefixTrailingSlash: "no-slash"`.
+4. **Rota** — em `<módulo>.routes.ts`: `app.patch("/:userId", { schema: xxxRouteSchema, preHandler: requirePermission("backoffice.users.update") }, xxxController)`. Rotas com parâmetro por último. Rota raiz (`"/"`) com `prefixTrailingSlash: "no-slash"`. Permissão nova? Acrescente em `permission.catalog.ts` antes (ver **Sessão e autenticação**).
 5. **Tag nova?** Registre em `src/config/swagger.ts` com descrição.
 6. **Módulo novo?** Crie a pasta, exporte `xxxRoutes: FastifyPluginAsyncZod` e registre em `src/routes.ts` (dentro do grupo protegido, salvo rota pública).
 7. **Banco mudou?** Edite `prisma/schema.prisma`, rode `npm run db:migrate -- --name <descricao>`, adicione a tabela nova ao `TRUNCATE` de `src/tests/setup.ts` e, se fizer sentido, ao `prisma/seed.ts`.
-8. **Teste** em `src/tests/modules/<módulo>/<verboEntidade>.test.ts` (ver seção Testes).
+8. **Teste** em `src/tests/modules/<módulo>/<verboEntidade>.test.ts` (ver seção Testes), incluindo 403 sem a permissão e sucesso só com ela.
 9. `npm run openapi:export` e commite `docs/openapi.json`.
 10. `npm run check` verde.
 
@@ -309,14 +315,26 @@ Exemplo: `PATCH /api/client/users/:userId`.
 ### Sessão e autenticação
 
 - Login grava o cookie `token` (`SESSION_COOKIE_NAME`) com JWT curto (`sub` = id do usuário, expira em `SESSION_TTL_HOURS`). Logout limpa o cookie com as **mesmas opções** (`sessionCookieOptions`).
-- `requireSession` (hook `onRequest` do grupo protegido em `routes.ts`) valida o JWT, **recarrega o usuário do banco** (bloqueio e exclusão valem na hora) e preenche `request.user`.
-- Em controller protegido use `getAuthenticatedUser(request)` — devolve `{ id, name, email, companyId }` já estreitado.
+- `requireSession` (hook `onRequest` do grupo protegido em `routes.ts`) valida o JWT, **recarrega do banco o usuário e as permissões efetivas numa leitura só** (bloqueio, exclusão e mudança de cargo valem na próxima requisição, sem novo login) e preenche `request.user`. O JWT não carrega permissão.
+- Em controller protegido use `getAuthenticatedUser(request)` — devolve `{ id, name, email, companyId, permissions }` já estreitado.
 - Rota pública nova (ex.: recuperação de senha) entra em `session.routes.ts` ou num módulo registrado **fora** do grupo protegido.
-- Não existe papel/permissão ainda. Quando existir, ele entra em `AuthenticatedUser` e vira um hook `requireRole(...)` ao lado de `requireSession`.
+
+#### Permissões (RBAC, no padrão do sul-oxidos)
+
+- **Modelo**: catálogo de `Permission` **global** (igual para toda empresa); `Role` (cargo) **por empresa** (`companyId`, `name` único na empresa mesmo após exclusão lógica); `RolePermission` e `UserRole` ligam as pontas. Um usuário pode ter vários cargos; as permissões efetivas são a **união dos cargos não excluídos**. Não há permissão direta por usuário.
+- **Nome**: `modulo.entidade.acao`, entidade em camelCase (`backoffice.users.read`, `backoffice.systemConfigs.update`). Não existe permissão de acesso a módulo.
+- **Catálogo** em `src/modules/permissions/permission.catalog.ts` (`PERMISSION_CATALOG`): fonte única, com `module`, `groupLabel`, `action`, `label` pt-BR e `sortOrder` para a tela de cargos. `syncPermissionCatalogService()` leva o catálogo ao banco: cria as novas, atualiza metadados, apaga as de `OBSOLETE_PERMISSION_NAMES`. Permissão **nova** chega só ao cargo `Administrador` de cada empresa; permissão retirada à mão de um cargo não volta. Nunca renomeie um `name`: mova o antigo para obsoletas e crie o novo.
+- **Onde a sincronização roda**: na **subida do servidor** (`server.ts`, antes do `listen`), no seed e no `setup.ts` da suíte. Em produção ela depende do schema atualizado: o `prisma migrate deploy` roda **antes** de subir a versão nova. Falha na sincronização (ex.: migration não aplicada) impede a subida com `Falha ao sincronizar o catálogo de permissões` no log. Execuções simultâneas (várias instâncias subindo, seed com a suíte) se serializam por `pg_advisory_xact_lock`, primeiro comando da transação do service (por `$executeRaw`, porque devolve `void`); a transação tem `timeout` de 30 s para a instância que espera a trava não cair no P2028.
+- **Cargo `Administrador`**: toda empresa tem um (`isSystem: true`, `ADMIN_ROLE`), com o catálogo inteiro, criado por `createAdminRoleService` junto com a empresa (register, seed).
+- **Último administrador**: a empresa nunca fica sem administrador ativo. Todo caminho que pode reduzir os administradores ativos (bloquear, excluir, tirar o cargo `Administrador`) segue o mesmo padrão, numa transação interativa só: (1) `lockCompanyAdminsService({ companyId }, tx)` trava a linha da empresa (`SELECT ... FOR NO KEY UPDATE`), (2) `isLastActiveAdminService({ companyId, userId }, tx)` com o mesmo `tx` e `BadRequestError` (400) quando for o último, (3) a escrita pelo `tx`. Sem a trava, duas requisições simultâneas passam juntas pela checagem e a empresa fica sem administrador. Trabalho lento (bcrypt) vai antes da transação. Referência: `updateUserService` e `deleteUserService`; o teste da corrida usa `raceAgainstAdminChange` de `src/tests/helpers/companyAdminsLock.ts`.
+- **Rota com permissão**: `preHandler: requirePermission("backoffice.users.read")` (ou `requireAnyPermission([...])` quando basta uma), de `@/hooks/requirePermission`. O parâmetro é `PermissionName`: nome fora do catálogo não compila. Falta de permissão lança `ForbiddenError("Você não possui permissão de acesso.")` (403). Rota sem `preHandler` só exige sessão (hoje: `GET /users/me` e upload).
+- Permissão **nova**: (1) acrescente em `PERMISSION_CATALOG` (grupo e `sortOrder` coerentes), (2) use em `requirePermission`, (3) nada a rodar à mão: o `npm run dev` reinicia ao salvar e sincroniza na subida (e o deploy, depois do `migrate deploy`), (4) teste 403/2xx.
+- **Na sessão**: login, register e `GET /users/me` devolvem `user.permissions: string[]`, achatado e em ordem alfabética. O frontend esconde menu e botões com `includes`; quem autoriza é o backend.
+- Cargo ou usuário de outra empresa responde **404** (mesma regra do tenant). Ao vincular usuário e cargo, os dois precisam ser da mesma empresa: o banco **não** garante isso (não há FK composta), a aplicação garante em dois pontos: o service de vínculo recusa, e a leitura das permissões efetivas (`effectivePermissionsSelect`) só considera cargo da empresa do usuário, então um vínculo cruzado gravado por fora nunca concede permissão.
 
 ### Multi-tenant e exclusão lógica
 
-- `Company` é o tenant. `User.companyId` é obrigatório. Toda entidade de negócio nova ganha `companyId` + `@@index([companyId])` e é filtrada por ele nos services.
+- `Company` é o tenant. `User.companyId` é obrigatório. Toda entidade de negócio nova ganha `companyId` + `@@index([companyId])` e é filtrada por ele nos services. `Role` também é por empresa (cargo de outra empresa responde 404); só o catálogo `Permission` é global.
 - Exclusão é lógica: `deletedAt` + `@@index([deletedAt])`. Leitura filtra `...notDeleted` (de `@/lib/prisma`). Excluir = `update({ deletedAt: new Date() })`, nunca `delete`.
 - `email` de usuário continua único após exclusão lógica (decisão do template). Reativar = limpar `deletedAt`.
 
@@ -327,6 +345,7 @@ Exemplo: `PATCH /api/client/users/:userId`.
 - Migrations: `npm run db:migrate -- --name <descricao>` em dev; `npm run db:deploy` em CI/produção. Nunca edite migration já aplicada.
 - Seed idempotente (`upsert`) em `prisma/seed.ts`; dados fictícios.
 - Transação: `prisma.$transaction([...])` para leituras em lote; `prisma.$transaction(async (tx) => ...)` para escrita atômica — passe `tx` para os services envolvidos quando precisar (assinatura `client: Prisma.TransactionClient = prisma`).
+- Regra que depende de contar linhas ("não pode ficar sem nenhum") checa e escreve na mesma transação, **depois de travar** a linha que agrupa o conjunto (ver **Último administrador**). SQL cru só por template tagueado (`` tx.$queryRaw`... ${valor}` ``), que vira parâmetro; nunca `$queryRawUnsafe` com valor interpolado.
 
 ### Variáveis de ambiente
 
@@ -344,13 +363,14 @@ Exemplo: `PATCH /api/client/users/:userId`.
 
 O que `../frontend-template` já consome — mantenha compatível:
 
-- `POST /api/client/session/login` e `/register` → `{ success, user }`; `POST /session/logout` → `{ success }`; `GET /users/me` → `{ user }`. `user` = `{ id, name, email, image | null }`. 401 em `/users/me` = frontend redireciona para o login.
+- `POST /api/client/session/login` e `/register` → `{ success, user }`; `POST /session/logout` → `{ success }`; `GET /users/me` → `{ user }`. `user` = `{ id, name, email, image | null, permissions: string[] }`. 401 em `/users/me` = frontend redireciona para o login.
+- Falta de permissão numa rota responde **403** `{ message: "Você não possui permissão de acesso." }`.
 - Erro sempre com `message` no topo (`extractResponseMessage` do frontend lê `message` plano ou aninhado um nível).
 - Sucesso de mutation com `message` → toast automático.
 - Listas: `page` 0-based, `pageSize`, `orderBy`, `order`, filtros múltiplos `a,b,c`; resposta `{ <entidades>, count }`.
 - Upload: `POST /upload/file` com campo `file`, resposta com `Location`.
 - Datas trafegam como ISO 8601 UTC. Data sem hora vai como `AAAA-MM-DD` (coluna `@db.Date`).
-- Campos futuros já previstos pelo frontend em `user`: `permissions?: string[]` e `idleTimeoutMinutes?: number | null`. Quando implementar, use exatamente esses nomes.
+- Campo futuro já previsto pelo frontend em `user`: `idleTimeoutMinutes?: number | null`. Quando implementar, use exatamente esse nome. (`permissions` já é entregue.)
 - `../app-template` hoje roda em modo fake e espera token no header `Authorization` — ainda **não** é atendido por esta API (decisão: cookie apenas). Ao integrar o app, a decisão precisa ser revista aqui e no app.
 
 ### Swagger / OpenAPI
@@ -377,7 +397,7 @@ O que `../frontend-template` já consome — mantenha compatível:
 | `npm run db:up` / `db:down` | Sobe/derruba o Postgres do compose                              |
 | `npm run db:migrate -- --name x` | Cria e aplica migration em dev                             |
 | `npm run db:deploy`      | Aplica migrations pendentes (CI/produção)                          |
-| `npm run db:seed`        | Popula `admin@admin.com` / `123123123`                             |
+| `npm run db:seed`        | Sincroniza o catálogo de permissões e popula `admin@admin.com` / `123123123` (Administrador) |
 | `npm run db:generate`    | Gera o client do Prisma                                            |
 | `npm run db:studio`      | Prisma Studio                                                      |
 | `npm run openapi:export` | Grava `docs/openapi.json`                                          |

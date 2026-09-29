@@ -33,12 +33,14 @@ export const createUserResponseSchema = z.object({
 export const createUserRouteSchema = {
   tags: ["Users"],
   summary: "Cria um usuário na empresa",
+  description: "Exige `backoffice.users.create`. O usuário nasce sem cargo.",
   security: [{ cookieAuth: [] }],
   body: createUserBodySchema,
   response: {
     201: createUserResponseSchema,
     400: errorResponseSchema,
     401: errorResponseSchema,
+    403: errorResponseSchema,
     409: errorResponseSchema,
   },
 };

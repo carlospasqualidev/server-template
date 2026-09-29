@@ -1,5 +1,7 @@
 import { BadRequestError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { isLastActiveAdminService } from "@/modules/permissions/services/isLastActiveAdmin.service";
+import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
 import { findUserByIdService } from "@/modules/users/services/findUserById.service";
 
 interface DeleteUserInput {
@@ -16,5 +18,13 @@ export async function deleteUserService({ companyId, userId, currentUserId }: De
 
   await findUserByIdService({ companyId, userId });
 
-  await prisma.user.update({ where: { id: userId }, data: { deletedAt: new Date(), isActive: false } });
+  await prisma.$transaction(async (tx) => {
+    await lockCompanyAdminsService({ companyId }, tx);
+
+    if (await isLastActiveAdminService({ companyId, userId }, tx)) {
+      throw new BadRequestError("Não é possível excluir o último administrador ativo da empresa.");
+    }
+
+    await tx.user.update({ where: { id: userId }, data: { deletedAt: new Date(), isActive: false } });
+  });
 }

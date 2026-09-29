@@ -10,7 +10,8 @@ export const findCurrentUserResponseSchema = z.object({
 export const findCurrentUserRouteSchema = {
   tags: ["Users"],
   summary: "Usuário da sessão atual",
-  description: "Valida a sessão e devolve o usuário autenticado. O frontend chama ao carregar.",
+  description:
+    "Valida a sessão e devolve o usuário autenticado com as permissões efetivas. Só exige sessão. O frontend chama ao carregar.",
   security: [{ cookieAuth: [] }],
   response: { 200: findCurrentUserResponseSchema, 401: errorResponseSchema },
 };

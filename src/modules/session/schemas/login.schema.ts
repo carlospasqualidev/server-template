@@ -23,7 +23,8 @@ export const loginResponseSchema = z.object({
 export const loginRouteSchema = {
   tags: ["Session"],
   summary: "Autentica um usuário",
-  description: "Valida as credenciais e grava o cookie HTTP-only de sessão.",
+  description:
+    "Valida as credenciais, grava o cookie HTTP-only de sessão e devolve o usuário com as permissões efetivas.",
   body: loginBodySchema,
   response: {
     200: loginResponseSchema,

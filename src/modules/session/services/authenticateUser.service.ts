@@ -1,6 +1,7 @@
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { ForbiddenError, UnauthorizedError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { findEffectivePermissionsService } from "@/modules/permissions/services/findEffectivePermissions.service";
 
 let fallbackHash: Promise<string> | undefined;
 
@@ -14,7 +15,7 @@ function getFallbackHash(): Promise<string> {
 export async function authenticateUserService({ email, password }: { email: string; password: string }) {
   const user = await prisma.user.findFirst({
     where: { email, ...notDeleted },
-    select: { id: true, name: true, email: true, image: true, password: true, isActive: true },
+    select: { id: true, companyId: true, name: true, email: true, image: true, password: true, isActive: true },
   });
 
   const passwordMatches = await verifyPassword(password, user?.password ?? (await getFallbackHash()));
@@ -27,5 +28,8 @@ export async function authenticateUserService({ email, password }: { email: stri
     throw new ForbiddenError("Sua conta está bloqueada.");
   }
 
-  return { id: user.id, name: user.name, email: user.email, image: user.image };
+  // Lidas só depois da senha conferida: a consulta das credenciais custa o mesmo exista o e-mail ou não.
+  const permissions = await findEffectivePermissionsService({ userId: user.id, companyId: user.companyId });
+
+  return { id: user.id, name: user.name, email: user.email, image: user.image, permissions };
 }

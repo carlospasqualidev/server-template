@@ -28,7 +28,7 @@ npm install                # instala e gera o client do Prisma (postinstall)
 cp .env.example .env       # ajuste JWT_SECRET e DATABASE_URL se necessário
 npm run db:up              # Postgres em docker (cria server_template e server_template_test)
 npm run db:deploy          # aplica as migrations
-npm run db:seed            # admin@admin.com / 123123123
+npm run db:seed            # catálogo de permissões + admin@admin.com / 123123123 (Administrador)
 npm run dev                # http://localhost:8080
 ```
 
@@ -53,7 +53,7 @@ Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run
 | `npm run db:up` / `db:down`       | Sobe / derruba o Postgres do compose                |
 | `npm run db:migrate -- --name x`  | Cria e aplica uma migration (dev)                   |
 | `npm run db:deploy`               | Aplica migrations pendentes (CI / produção)         |
-| `npm run db:seed`                 | Popula os dados iniciais                            |
+| `npm run db:seed`                 | Sincroniza as permissões e popula os dados iniciais |
 | `npm run db:generate`             | Gera o client do Prisma em `src/generated`          |
 | `npm run db:studio`               | Prisma Studio                                       |
 | `npm run openapi:export`          | Grava o contrato em `docs/openapi.json`             |
@@ -81,38 +81,43 @@ Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
 ## Rotas atuais
 
-Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`.
+Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm permissão respondem 403 sem ela.
 
-| Método   | Rota                | Protegida | Descrição                                                                     |
-| -------- | ------------------- | --------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/session/login`    | não       | Autentica e grava o cookie                                                    |
-| `POST`   | `/session/register` | não       | Cria empresa + usuário e inicia a sessão                                      |
-| `POST`   | `/session/logout`   | não       | Limpa o cookie                                                                |
-| `GET`    | `/users/me`         | sim       | Usuário da sessão                                                             |
-| `GET`    | `/users`            | sim       | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
-| `GET`    | `/users/:userId`    | sim       | Busca por id (mesma empresa)                                                  |
-| `POST`   | `/users`            | sim       | Cria usuário na empresa                                                       |
-| `PATCH`  | `/users/:userId`    | sim       | Atualização parcial                                                           |
-| `DELETE` | `/users/:userId`    | sim       | Exclusão lógica                                                               |
-| `POST`   | `/upload/file`      | sim       | Envia um arquivo (campo `file`) para o S3                                     |
+| Método   | Rota                | Protegida | Permissão                 | Descrição                                                                     |
+| -------- | ------------------- | --------- | ------------------------- | ----------------------------------------------------------------------------- |
+| `POST`   | `/session/login`    | não       |                           | Autentica e grava o cookie                                                    |
+| `POST`   | `/session/register` | não       |                           | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
+| `POST`   | `/session/logout`   | não       |                           | Limpa o cookie                                                                |
+| `GET`    | `/users/me`         | sim       |                           | Usuário da sessão, com `permissions`                                          |
+| `GET`    | `/users`            | sim       | `backoffice.users.read`   | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
+| `GET`    | `/users/:userId`    | sim       | `backoffice.users.read`   | Busca por id (mesma empresa)                                                  |
+| `POST`   | `/users`            | sim       | `backoffice.users.create` | Cria usuário na empresa                                                       |
+| `PATCH`  | `/users/:userId`    | sim       | `backoffice.users.update` | Atualização parcial                                                           |
+| `DELETE` | `/users/:userId`    | sim       | `backoffice.users.delete` | Exclusão lógica                                                               |
+| `POST`   | `/upload/file`      | sim       |                           | Envia um arquivo (campo `file`) para o S3                                     |
 
 Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `issues: [{ path, message }]`. O contrato completo, gerado dos schemas, fica em [`docs/openapi.json`](docs/openapi.json).
+
+## Permissões
+
+Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e antes de cada teste; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. Regras e passo a passo para uma permissão nova: [`CLAUDE.md`](CLAUDE.md#permissões-rbac-no-padrão-do-sul-oxidos).
 
 ## Estrutura
 
 ```
 src/
   app.ts            monta a aplicação (plugins, Zod, error handler, rotas)
-  server.ts         listen + graceful shutdown
+  server.ts         sincroniza o catálogo de permissões, listen + graceful shutdown
   routes.ts         /api → /client → módulos (grupo protegido por requireSession)
   config/           env (Zod), constants, cors, logger, swagger
-  hooks/            requireSession
+  hooks/            requireSession, requirePermission
   lib/              prisma, errors, http (paginação/respostas), validation, auth, storage, format
   modules/
     health/         liveness e readiness
     session/        login, register, logout
     users/          CRUD de referência (paginação, busca, allowlist de ordenação, tenant, soft delete)
     upload/         arquivo → S3
+    permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado
@@ -134,7 +139,7 @@ O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e crede
 ## Docker e produção
 
 - `Dockerfile` multi-stage: compila em `node:22-slim`, roda `dist/server.js` só com dependências de produção.
-- Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão.
+- Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão. A subida depende disso: antes do `listen` o servidor sincroniza o catálogo de permissões e, se falhar, encerra com erro.
 - Health checks para o orquestrador: `/health` (liveness) e `/health/ready` (readiness).
 - O processo encerra com `SIGTERM` fechando conexões (graceful shutdown).
 

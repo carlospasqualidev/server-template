@@ -6,7 +6,8 @@ import { findSessionUserService } from "@/modules/session/services/findSessionUs
 
 /**
  * Hook `onRequest` das rotas protegidas: lê o cookie de sessão (`SESSION_COOKIE_NAME`), valida o JWT,
- * recarrega o usuário do banco (para bloqueio e exclusão valerem na hora) e preenche `request.user`.
+ * recarrega o usuário e as permissões efetivas do banco numa leitura só (para bloqueio, exclusão e mudança de cargo
+ * valerem na hora; o JWT não carrega permissão) e preenche `request.user`.
  */
 export async function requireSession(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   const { token } = request.cookies;
@@ -26,5 +27,11 @@ export async function requireSession(request: FastifyRequest, _reply: FastifyRep
     throw new ForbiddenError("Conta bloqueada.");
   }
 
-  request.user = { id: user.id, name: user.name, email: user.email, companyId: user.companyId };
+  request.user = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    companyId: user.companyId,
+    permissions: user.permissions,
+  };
 }
