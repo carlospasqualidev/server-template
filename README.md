@@ -36,7 +36,7 @@ npm run dev                # http://localhost:8080
 - Swagger UI: `http://localhost:8080/docs` (JSON em `/docs/json`)
 - Health: `GET /health` (processo) e `GET /health/ready` (processo + banco)
 
-Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run db:up` e troque a porta em `DATABASE_URL` (e em `TEST_DATABASE_URL` para os testes).
+Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run db:up` e troque a porta em `DATABASE_URL`. A suíte de testes usa o mesmo servidor do `DATABASE_URL` do `.env`, só trocando o nome do banco para `server_template_test`.
 
 ## Scripts
 
@@ -129,7 +129,7 @@ npm run db:up
 npm test
 ```
 
-Para apontar outro banco: `TEST_DATABASE_URL=postgresql://... npm test`. Por segurança o nome do banco precisa terminar em `_test`.
+O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e credenciais, banco `server_template_test`), então basta o `.env` estar certo para `npm test` e o hook de `pre-push` funcionarem. Para apontar outro servidor, `TEST_DATABASE_URL=postgresql://... npm test` (é o que o CI faz). Por segurança o nome do banco precisa terminar em `_test`.
 
 ## Docker e produção
 

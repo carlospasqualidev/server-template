@@ -165,7 +165,7 @@ Regras práticas:
 Uma camada só: **integração real** com Vitest + `app.inject()` contra um Postgres descartável. Sem mock de banco, sem porta HTTP, sem Docker dentro do teste.
 
 - Banco de teste: `server_template_test` (criado pelo `docker compose` e, se faltar, pelo `globalSetup`). O `globalSetup` **recusa** rodar contra banco cujo nome não termine em `_test`, porque cada teste começa com `TRUNCATE` (ver `src/tests/setup.ts`). **Tabela nova entra na lista do `TRUNCATE`.**
-- Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local. `TEST_DATABASE_URL` sobrescreve o banco (CI).
+- Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local, exceto pelo endereço do banco, derivado do `DATABASE_URL` do arquivo `.env` (mesmo servidor, banco `server_template_test`). `TEST_DATABASE_URL` sobrescreve (CI). O `DATABASE_URL` do shell é ignorado de propósito.
 - Todos os testes vivem em [`src/tests/`](src/tests), importados via alias `@/`:
 
 ```
@@ -389,7 +389,7 @@ O que `../frontend-template` já consome — mantenha compatível:
 
 - Windows (PowerShell) no dia a dia. Em comandos shell use sintaxe PS (`$env:VAR`, sem `&&` em PS 5.1) — nos scripts npm, `&&` funciona porque roda no shell do npm.
 - Node >= 22.12 (`.nvmrc` = 22; CI roda em Node 22). `npm` com `package-lock.json`.
-- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL`/`TEST_DATABASE_URL`.
+- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor.
 - bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
 
 ---
