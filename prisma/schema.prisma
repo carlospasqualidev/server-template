@@ -1,8 +1,13 @@
+// `importFileExtension` e `moduleFormat` fixos: sem eles o Prisma deduz ambos do tsconfig.json (com
+// `moduleResolution: "bundler"` gera imports sem extensao; com `allowImportingTsExtensions` ou
+// `rewriteRelativeImportExtensions`, gera `.ts`). Com `.js` explicito, o client funciona no tsx, no
+// Vitest e no `tsc --noEmit` (que resolvem `.js` para o `.ts`) e sai no dist ja pronto para o Node.
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "esm"
-  runtime      = "nodejs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+  runtime             = "nodejs"
 }
 
 datasource db {
