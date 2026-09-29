@@ -27,5 +27,6 @@ export const registerRouteSchema = {
     201: registerResponseSchema,
     400: errorResponseSchema,
     409: errorResponseSchema,
+    429: errorResponseSchema,
   },
 };

@@ -13,5 +13,5 @@ export const findCurrentUserRouteSchema = {
   description:
     "Valida a sessão e devolve o usuário autenticado com as permissões efetivas. Só exige sessão. O frontend chama ao carregar.",
   security: [{ cookieAuth: [] }],
-  response: { 200: findCurrentUserResponseSchema, 401: errorResponseSchema },
+  response: { 200: findCurrentUserResponseSchema, 401: errorResponseSchema, 403: errorResponseSchema },
 };
