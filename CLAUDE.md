@@ -151,7 +151,7 @@ Regras práticas:
 
 ## Performance
 
-- **Listagem sempre paginada** (`paginationQuerySchema`, máx. `MAX_PAGE_SIZE`). Sem `findMany` sem `take`. Exceções: (1) o catálogo de permissões (`GET /roles/permissions`), finito e vindo do código; (2) consulta limitada pelo tamanho **validado** do corpo: lista de ids com `.max(MAX_BODY_IDS, "<mensagem pt-BR>")` no schema da rota, usada como `id: { in: [...] }` (ou `userId: { in: [...] }`). Lista sem `max` não é limite. Para o que fica fora da lista (ex.: quem sai do cargo), escreva com `notIn` em vez de ler o conjunto inteiro.
+- **Listagem sempre paginada** (`paginationQuerySchema`, máx. `MAX_PAGE_SIZE`). Sem `findMany` sem `take`. Exceções: (1) catálogo finito vindo do código: o de permissões (`GET /roles/permissions`) e o de configurações de sistema (`GET /system-configs`, que lê só as chaves do catálogo, no máximo uma linha por chave pelo índice único); (2) consulta limitada pelo tamanho **validado** do corpo: lista de ids com `.max(MAX_BODY_IDS, "<mensagem pt-BR>")` no schema da rota, usada como `id: { in: [...] }` (ou `userId: { in: [...] }`). Lista sem `max` não é limite. Para o que fica fora da lista (ex.: quem sai do cargo), escreva com `notIn` em vez de ler o conjunto inteiro.
 - `select` explícito em toda consulta (ver `users.select.ts`). Nunca `include` cego nem devolver a linha inteira.
 - `prisma.$transaction([findMany, count])` para lista + total numa ida só.
 - **Índices**: toda FK e todo `deletedAt` têm `@@index` no schema. Campo novo usado em `where`/`orderBy` frequente ganha índice na mesma migration.
@@ -177,7 +177,7 @@ src/tests/
 ├── helpers/
 │   ├── app.ts                     # createTestApp(options) → app pronto para inject()
 │   ├── session.ts                 # sessionCookiesFor(userId) → cookie válido sem passar pelo login
-│   ├── factories.ts               # createCompany(), createRole({...}), findAdminRole(companyId), createUser({...}), findPermissionIds([...]), findRolePermissionNames(roleId)
+│   ├── factories.ts               # createCompany(), createRole({...}), findAdminRole(companyId), createUser({...}), findPermissionIds([...]), findRolePermissionNames(roleId), createSystemConfig({ companyId, key, value })
 │   ├── companyAdminsLock.ts       # raceAgainstAdminChange({...}) → corrida contra a trava da empresa (último administrador, vínculo x exclusão de cargo), determinística
 │   ├── permissionCatalogLock.ts   # raceAgainstCatalogSync({...}) → operação concorrente a uma sincronização do catálogo, determinística
 │   └── multipart.ts               # buildMultipartBody([...]) para upload
@@ -247,7 +247,7 @@ scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
 docs/openapi.json           # contrato gerado; commitado
 ```
 
-Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo).
+Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
 
 ---
 
@@ -271,7 +271,7 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 | `hooks`       | services, `@/lib/*`, `permission.catalog` (tipos) | `@/lib/prisma`                         |
 | `lib`, `config` | `@/lib/*`, `@/config/*`, `@/generated`        | `@/modules/*`                            |
 
-Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro. O módulo `permissions` expõe também `permission.catalog.ts` (catálogo, `PermissionName`, `PermissionModule`, `ADMIN_ROLE`) e `permissions.select.ts` (`effectivePermissionsSelect({ userId } | { companyId })` + `toPermissionNames`, para ler usuário e permissões na mesma consulta).
+Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro. O módulo `permissions` expõe também `permission.catalog.ts` (catálogo, `PermissionName`, `PermissionModule`, `ADMIN_ROLE`) e `permissions.select.ts` (`effectivePermissionsSelect({ userId } | { companyId })` + `toPermissionNames`, para ler usuário e permissões na mesma consulta). O módulo `systemConfigs` expõe `systemConfig.catalog.ts` (catálogo, `SystemConfigKey`, `SystemConfigValue<K>`) e `systemConfig.definition.ts` (tipos de valor, conversão e serialização).
 
 ### Anatomia de um endpoint — checklist para criar um novo
 
@@ -298,6 +298,7 @@ Exemplo: `PATCH /api/client/users/:userId`.
 | ------------------------ | ---------------------------------------------- | ------ |
 | Um registro              | `{ user: {...} }` (chave = entidade no singular) | 200    |
 | Lista                    | `{ users: [...], count: <total sem paginação> }` | 200    |
+| Lista finita do código, sem paginação | `{ systemConfigs: [...] }`, sem `count` (a lista inteira sempre vem) | 200 |
 | Criação                  | `{ message: "Usuário criado.", user: {...} }`  | 201    |
 | Edição                   | `{ message: "Usuário atualizado.", user: {...} }` | 200 |
 | Exclusão / ação sem dado | `{ message: "Usuário excluído." }`             | 200    |
@@ -318,6 +319,7 @@ Exemplo: `PATCH /api/client/users/:userId`.
 - Login grava o cookie `token` (`SESSION_COOKIE_NAME`) com JWT curto (`sub` = id do usuário, expira em `SESSION_TTL_HOURS`). Logout limpa o cookie com as **mesmas opções** (`sessionCookieOptions`).
 - `requireSession` (hook `onRequest` do grupo protegido em `routes.ts`) valida o JWT, **recarrega do banco o usuário e as permissões efetivas numa leitura só** (bloqueio, exclusão e mudança de cargo valem na próxima requisição, sem novo login) e preenche `request.user`. O JWT não carrega permissão.
 - Em controller protegido use `getAuthenticatedUser(request)` — devolve `{ id, name, email, companyId, permissions }` já estreitado.
+- Login, register e `GET /users/me` devolvem também `user.idleTimeoutMinutes: number`, já resolvido por `resolveIdleTimeoutMinutesService` (ver **Configurações de sistema**). Quem desloga por inatividade é o cliente; o servidor não impõe o timeout (o JWT vale até `SESSION_TTL_HOURS`).
 - Rota pública nova (ex.: recuperação de senha) entra em `session.routes.ts` ou num módulo registrado **fora** do grupo protegido.
 
 ### Permissões e cargos
@@ -352,6 +354,18 @@ RBAC no padrão do sul-oxidos: base em `src/modules/permissions/` (catálogo, si
 - **Limite do corpo**: `permissionIds`, `roleIds` e `userIds` aceitam no máximo `MAX_BODY_IDS` (1000) ids (400 com `issues`). `PUT /roles/:roleId/users` lê só os ids da lista e o autor, e tira quem sai por `notIn`: cargo com mais usuários que o limite é gerido pelos cargos de cada usuário.
 - **Tenant**: cargo, usuário ou vínculo de outra empresa responde 404, também quando vem num corpo (`roleIds`, `userIds`). A contagem e a listagem de usuários do cargo (`roleMembersWhere`) só consideram usuário não excluído da mesma empresa.
 
+### Configurações de sistema
+
+Módulo `src/modules/systemConfigs/` (rotas `/api/client/system-configs`), escopo por **empresa**.
+
+- **Definições no código, valores no banco.** `SYSTEM_CONFIG_CATALOG` (`systemConfig.catalog.ts`) é a fonte única: `key`, `module` (`GENERAL`, `SECURITY`, `NOTIFICATIONS`), `label` e `description` pt-BR, `valueType` (`string`, `int`, `float`, `boolean`, `json`), `defaultValue` já no tipo e `rule` opcional (Zod sobre o valor convertido). A tabela `system_configs` guarda só `companyId + key → value` (texto); sem linha, vale o padrão.
+- **Acrescentar uma chave**: (1) uma entrada no catálogo, junto das chaves do mesmo `module` e na ordem em que a tela deve mostrá-la, com chave `<grupo>.<nomeCamelCase>`; (2) `defaultValue` no tipo do `valueType` (`int` → número: o compilador recusa a mistura) e, se houver, a `rule`, com mensagem pt-BR que não repete o valor; (3) nada a rodar: sem migration nem seed, a chave aparece para toda empresa com o padrão; (4) o teste do catálogo confere que o padrão passa pela própria regra. Nunca renomeie uma `key` (o valor gravado fica órfão). Endurecer a `rule` não invalida o que já foi gravado: o valor que não passa mais é lido como o padrão (na API e no código) até a empresa gravar de novo. Grupo novo entra em `SYSTEM_CONFIG_MODULES` e precisa de rótulo no frontend.
+- **Validação e gravação**: o schema do `PATCH` converte cada `value` pelo `valueType`, aplica a `rule` e entrega ao service o texto normalizado (`'020'` → `'20'`, e-mail em minúsculas, JSON compacto); a mensagem de erro é `<label>: <regra>`. O service faz `upsert` de cada item numa única `prisma.$transaction` interativa, na ordem do catálogo (dois lotes simultâneos travam as linhas na mesma ordem, sem deadlock), e relê a lista pelo mesmo `tx`.
+- **Leitura no código**: `getSystemConfigValueService({ companyId, key }, client?)` devolve o valor no tipo do catálogo (`SystemConfigValue<K>`: `security.idleTimeoutMinutes` → `number`). Fora do módulo, não leia `prisma.systemConfig` direto.
+- **Timeout de inatividade**: cascata `User.idleTimeoutMinutes` → `security.idleTimeoutMinutes` da empresa → padrão do catálogo (20), em `resolveIdleTimeoutMinutesService`, entregue na sessão. A faixa (1 a 480) é `IDLE_TIMEOUT_MINUTES_RANGE` (`src/config/constants.ts`), a mesma no cadastro do usuário e na configuração.
+- **Permissões**: `GET` exige `backoffice.systemConfigs.read`; `PATCH`, `backoffice.systemConfigs.update`.
+- Fora do template por ora: tipo `secret` com valor cifrado e configuração global (sem empresa) com herança.
+
 ### Multi-tenant e exclusão lógica
 
 - `Company` é o tenant. `User.companyId` é obrigatório. Toda entidade de negócio nova ganha `companyId` + `@@index([companyId])` e é filtrada por ele nos services. `Role` também é por empresa (cargo de outra empresa responde 404); só o catálogo `Permission` é global.
@@ -383,7 +397,7 @@ RBAC no padrão do sul-oxidos: base em `src/modules/permissions/` (catálogo, si
 
 O que `../frontend-template` já consome — mantenha compatível:
 
-- `POST /api/client/session/login` e `/register` → `{ success, user }`; `POST /session/logout` → `{ success }`; `GET /users/me` → `{ user }`. `user` = `{ id, name, email, image | null, permissions: string[] }`. 401 em `/users/me` = frontend redireciona para o login.
+- `POST /api/client/session/login` e `/register` → `{ success, user }`; `POST /session/logout` → `{ success }`; `GET /users/me` → `{ user }`. `user` = `{ id, name, email, image | null, permissions: string[], idleTimeoutMinutes: number }`. 401 em `/users/me` = frontend redireciona para o login.
 - Falta de permissão numa rota responde **403** `{ message: "Você não possui permissão de acesso." }`.
 - Cargos (`/roles` e `PUT /users/:userId/roles`) existem para o backoffice e ainda não são consumidos; o contrato está em `docs/openapi.json` e na seção **Permissões e cargos**.
 - Erro sempre com `message` no topo (`extractResponseMessage` do frontend lê `message` plano ou aninhado um nível).
@@ -391,7 +405,8 @@ O que `../frontend-template` já consome — mantenha compatível:
 - Listas: `page` 0-based, `pageSize`, `orderBy`, `order`, filtros múltiplos `a,b,c`; resposta `{ <entidades>, count }`.
 - Upload: `POST /upload/file` com campo `file`, resposta com `Location`.
 - Datas trafegam como ISO 8601 UTC. Data sem hora vai como `AAAA-MM-DD` (coluna `@db.Date`).
-- Campo futuro já previsto pelo frontend em `user`: `idleTimeoutMinutes?: number | null`. Quando implementar, use exatamente esse nome. (`permissions` já é entregue.)
+- `user.idleTimeoutMinutes` na sessão (login, register, `/users/me`): sempre um número já resolvido (usuário → empresa → 20), no nome que o frontend previu. No CRUD de usuários o mesmo campo é o valor **próprio** do usuário (`number | null`; null herda o da empresa), aceito em `POST /users` e `PATCH /users/:userId` (inteiro de 1 a 480, ou null).
+- Configurações de sistema: `GET /system-configs` → `{ systemConfigs: [{ key, module, label, description, valueType, value }] }`, sem `count`, na ordem do catálogo; `value` é **sempre string**. Gravação em lote atômica por `PATCH /system-configs` com `{ items: [{ key, value }] }`, resposta `{ message: "Configurações atualizadas.", systemConfigs }` (a tela não deve somar um toast próprio). Item inválido responde 400 com `issues` (`items.<i>.value` ou `items.<i>.key`) e `message` aberta pelo `label`. A chave é o identificador: não há `id`.
 - `../app-template` hoje roda em modo fake e espera token no header `Authorization` — ainda **não** é atendido por esta API (decisão: cookie apenas). Ao integrar o app, a decisão precisa ser revista aqui e no app.
 
 ### Swagger / OpenAPI

@@ -9,7 +9,7 @@ import { syncPermissionCatalogService } from "@/modules/permissions/services/syn
  */
 export async function resetDatabase(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "user_roles", "role_permissions", "roles", "permissions", "users", "companies" RESTART IDENTITY CASCADE',
+    'TRUNCATE TABLE "system_configs", "user_roles", "role_permissions", "roles", "permissions", "users", "companies" RESTART IDENTITY CASCADE',
   );
   await syncPermissionCatalogService();
 }

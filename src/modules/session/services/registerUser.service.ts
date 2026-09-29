@@ -5,6 +5,7 @@ import { effectivePermissionsSelect, toPermissionNames } from "@/modules/permiss
 import { createAdminRoleService } from "@/modules/permissions/services/createAdminRole.service";
 import { PERMISSION_CATALOG_LOCK_NAME } from "@/modules/permissions/services/syncPermissionCatalog.service";
 import { type RegisterBody } from "@/modules/session/schemas/register.schema";
+import { resolveIdleTimeoutMinutesService } from "@/modules/systemConfigs/services/resolveIdleTimeoutMinutes.service";
 
 /** Cria a empresa, o cargo `Administrador` dela e o usuário vinculado ao cargo, numa transação. */
 export async function registerUserService({ name, email, password }: RegisterBody) {
@@ -39,12 +40,18 @@ export async function registerUserService({ name, email, password }: RegisterBod
         name: true,
         email: true,
         image: true,
+        companyId: true,
+        idleTimeoutMinutes: true,
         userRoles: effectivePermissionsSelect({ companyId: company.id }),
       },
     });
   });
 
-  const { userRoles, ...summary } = user;
+  const { userRoles, companyId, idleTimeoutMinutes: userIdleTimeoutMinutes, ...summary } = user;
 
-  return { ...summary, permissions: toPermissionNames(userRoles) };
+  return {
+    ...summary,
+    permissions: toPermissionNames(userRoles),
+    idleTimeoutMinutes: await resolveIdleTimeoutMinutesService({ companyId, userIdleTimeoutMinutes }),
+  };
 }

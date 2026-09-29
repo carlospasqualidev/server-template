@@ -74,6 +74,74 @@ describe("PATCH /api/client/users/:userId", () => {
     expect(response.json().user).toMatchObject({ phone: null, image: null });
   });
 
+  describe("tempo de inatividade próprio (idleTimeoutMinutes)", () => {
+    it("define o tempo e o usuário passa a recebê-lo na sessão", async () => {
+      const admin = await createUser();
+      const target = await createUser({ companyId: admin.companyId });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { idleTimeoutMinutes: 90 },
+      });
+      const me = await app.inject({ method: "GET", url: `${USERS_URL}/me`, cookies: sessionCookiesFor(target.id) });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user.idleTimeoutMinutes).toBe(90);
+      expect(me.json().user.idleTimeoutMinutes).toBe(90);
+    });
+
+    it("null volta a herdar o da empresa", async () => {
+      const admin = await createUser();
+      const target = await createUser({ companyId: admin.companyId, idleTimeoutMinutes: 90 });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { idleTimeoutMinutes: null },
+      });
+      const me = await app.inject({ method: "GET", url: `${USERS_URL}/me`, cookies: sessionCookiesFor(target.id) });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user.idleTimeoutMinutes).toBeNull();
+      expect(me.json().user.idleTimeoutMinutes).toBe(20);
+    });
+
+    it("ausente no corpo não muda o tempo", async () => {
+      const admin = await createUser();
+      const target = await createUser({ companyId: admin.companyId, idleTimeoutMinutes: 90 });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { name: "Outro Nome" },
+      });
+
+      expect(response.json().user.idleTimeoutMinutes).toBe(90);
+    });
+
+    it.each([0, 481, 12.5, "30"])("%s fora da faixa responde 400 e não altera", async (idleTimeoutMinutes) => {
+      const admin = await createUser();
+      const target = await createUser({ companyId: admin.companyId, idleTimeoutMinutes: 90 });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { idleTimeoutMinutes },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues).toEqual([
+        { path: "idleTimeoutMinutes", message: "Informe um tempo de inatividade inteiro de 1 a 480 minutos." },
+      ]);
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: target.id } })).idleTimeoutMinutes).toBe(90);
+    });
+  });
+
   describe("último administrador ativo da empresa", () => {
     const LAST_ADMIN_MESSAGE = "Não é possível bloquear o último administrador ativo da empresa.";
 

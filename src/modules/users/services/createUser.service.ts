@@ -24,6 +24,7 @@ export async function createUserService({ companyId, data }: CreateUserInput) {
       password: await hashPassword(data.password),
       phone: data.phone ?? null,
       image: data.image ?? null,
+      idleTimeoutMinutes: data.idleTimeoutMinutes ?? null,
     },
     select: userSelect,
   });

@@ -44,6 +44,7 @@ describe("GET /api/client/users", () => {
       image: null,
       phone: null,
       isActive: true,
+      idleTimeoutMinutes: null,
       createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
     });

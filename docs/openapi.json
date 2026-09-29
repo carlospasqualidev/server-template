@@ -218,6 +218,13 @@
                             "backoffice.users.create",
                             "backoffice.users.read"
                           ]
+                        },
+                        "idleTimeoutMinutes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Minutos sem atividade até o logout automático no cliente, já resolvidos: o do cadastro do usuário, senão o da empresa (`security.idleTimeoutMinutes`), senão 20. O servidor não impõe: a sessão vale até expirar.",
+                          "example": 20
                         }
                       },
                       "required": [
@@ -225,7 +232,8 @@
                         "name",
                         "email",
                         "image",
-                        "permissions"
+                        "permissions",
+                        "idleTimeoutMinutes"
                       ],
                       "additionalProperties": false
                     }
@@ -502,6 +510,13 @@
                             "backoffice.users.create",
                             "backoffice.users.read"
                           ]
+                        },
+                        "idleTimeoutMinutes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Minutos sem atividade até o logout automático no cliente, já resolvidos: o do cadastro do usuário, senão o da empresa (`security.idleTimeoutMinutes`), senão 20. O servidor não impõe: a sessão vale até expirar.",
+                          "example": 20
                         }
                       },
                       "required": [
@@ -509,7 +524,8 @@
                         "name",
                         "email",
                         "image",
-                        "permissions"
+                        "permissions",
+                        "idleTimeoutMinutes"
                       ],
                       "additionalProperties": false
                     }
@@ -778,6 +794,19 @@
                             "type": "boolean",
                             "description": "Usuário bloqueado quando false."
                           },
+                          "idleTimeoutMinutes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -794,6 +823,7 @@
                           "image",
                           "phone",
                           "isActive",
+                          "idleTimeoutMinutes",
                           "createdAt",
                           "updatedAt"
                         ],
@@ -1005,6 +1035,19 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "idleTimeoutMinutes": {
+                    "description": "Tempo de inatividade próprio, em minutos (1 a 480). Ausente ou null: herda o da empresa.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 480
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -1066,6 +1109,19 @@
                           "type": "boolean",
                           "description": "Usuário bloqueado quando false."
                         },
+                        "idleTimeoutMinutes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -1082,6 +1138,7 @@
                         "image",
                         "phone",
                         "isActive",
+                        "idleTimeoutMinutes",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -1324,6 +1381,13 @@
                             "backoffice.users.create",
                             "backoffice.users.read"
                           ]
+                        },
+                        "idleTimeoutMinutes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Minutos sem atividade até o logout automático no cliente, já resolvidos: o do cadastro do usuário, senão o da empresa (`security.idleTimeoutMinutes`), senão 20. O servidor não impõe: a sessão vale até expirar.",
+                          "example": 20
                         }
                       },
                       "required": [
@@ -1331,7 +1395,8 @@
                         "name",
                         "email",
                         "image",
-                        "permissions"
+                        "permissions",
+                        "idleTimeoutMinutes"
                       ],
                       "additionalProperties": false
                     }
@@ -1456,6 +1521,19 @@
                           "type": "boolean",
                           "description": "Usuário bloqueado quando false."
                         },
+                        "idleTimeoutMinutes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -1472,6 +1550,7 @@
                         "image",
                         "phone",
                         "isActive",
+                        "idleTimeoutMinutes",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -1707,6 +1786,19 @@
                     "description": "false bloqueia o acesso.",
                     "type": "boolean"
                   },
+                  "idleTimeoutMinutes": {
+                    "description": "Tempo de inatividade próprio, em minutos (1 a 480). null volta a herdar o da empresa.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 480
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "password": {
                     "description": "Nova senha.",
                     "type": "string",
@@ -1784,6 +1876,19 @@
                           "type": "boolean",
                           "description": "Usuário bloqueado quando false."
                         },
+                        "idleTimeoutMinutes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -1800,6 +1905,7 @@
                         "image",
                         "phone",
                         "isActive",
+                        "idleTimeoutMinutes",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -2303,6 +2409,19 @@
                           "type": "boolean",
                           "description": "Usuário bloqueado quando false."
                         },
+                        "idleTimeoutMinutes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -2346,6 +2465,7 @@
                         "image",
                         "phone",
                         "isActive",
+                        "idleTimeoutMinutes",
                         "createdAt",
                         "updatedAt",
                         "roles"
@@ -5197,6 +5317,453 @@
         }
       }
     },
+    "/api/client/system-configs": {
+      "get": {
+        "summary": "Lista as configurações de sistema da empresa",
+        "tags": [
+          "SystemConfigs"
+        ],
+        "description": "Exige `backoffice.systemConfigs.read`. Devolve o catálogo inteiro, na ordem da tela, com o valor da empresa (o gravado ou o padrão). Lista finita, vinda do código: sem paginação e sem `count`.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "systemConfigs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "enum": [
+                              "app.name",
+                              "app.supportEmail",
+                              "security.idleTimeoutMinutes",
+                              "notifications.email"
+                            ],
+                            "description": "Chave estável, `<grupo>.<nome>`: é o que o `PATCH` recebe."
+                          },
+                          "module": {
+                            "type": "string",
+                            "enum": [
+                              "GENERAL",
+                              "SECURITY",
+                              "NOTIFICATIONS"
+                            ],
+                            "description": "Grupo da tela."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Rótulo do campo (pt-BR)."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Texto de ajuda do campo (pt-BR)."
+                          },
+                          "valueType": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "int",
+                              "float",
+                              "boolean",
+                              "json"
+                            ],
+                            "description": "Tipo do valor: define o campo da tela e a validação na gravação."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "Valor efetivo, sempre como texto (`'true'`/`'false'`, `'20'`, JSON): o gravado pela empresa ou, sem gravação, o padrão."
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "module",
+                          "label",
+                          "description",
+                          "valueType",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Todas as configurações do catálogo, na ordem da tela (agrupadas por `module`). Sem paginação."
+                    }
+                  },
+                  "required": [
+                    "systemConfigs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Grava configurações de sistema da empresa em lote",
+        "tags": [
+          "SystemConfigs"
+        ],
+        "description": "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Responde a lista completa, como `GET /system-configs`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "enum": [
+                            "app.name",
+                            "app.supportEmail",
+                            "security.idleTimeoutMinutes",
+                            "notifications.email"
+                          ],
+                          "description": "Chave da configuração (a de `GET /system-configs`).",
+                          "example": "security.idleTimeoutMinutes"
+                        },
+                        "value": {
+                          "type": "string",
+                          "description": "Novo valor, sempre como texto: `'true'`/`'false'` em boolean, número com ponto decimal, JSON serializado.",
+                          "example": "30"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "value"
+                      ]
+                    },
+                    "description": "Configurações alteradas, cada chave uma vez. Todas são gravadas, ou nenhuma."
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "systemConfigs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "enum": [
+                              "app.name",
+                              "app.supportEmail",
+                              "security.idleTimeoutMinutes",
+                              "notifications.email"
+                            ],
+                            "description": "Chave estável, `<grupo>.<nome>`: é o que o `PATCH` recebe."
+                          },
+                          "module": {
+                            "type": "string",
+                            "enum": [
+                              "GENERAL",
+                              "SECURITY",
+                              "NOTIFICATIONS"
+                            ],
+                            "description": "Grupo da tela."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Rótulo do campo (pt-BR)."
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Texto de ajuda do campo (pt-BR)."
+                          },
+                          "valueType": {
+                            "type": "string",
+                            "enum": [
+                              "string",
+                              "int",
+                              "float",
+                              "boolean",
+                              "json"
+                            ],
+                            "description": "Tipo do valor: define o campo da tela e a validação na gravação."
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "Valor efetivo, sempre como texto (`'true'`/`'false'`, `'20'`, JSON): o gravado pela empresa ou, sem gravação, o padrão."
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "module",
+                          "label",
+                          "description",
+                          "valueType",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Todas as configurações do catálogo, na ordem da tela (agrupadas por `module`). Sem paginação."
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "systemConfigs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/client/upload/file": {
       "post": {
         "summary": "Envia um arquivo para o storage",
@@ -5475,6 +6042,10 @@
     {
       "name": "Roles",
       "description": "Cargos da empresa, os usuários de cada um e o catálogo de permissões."
+    },
+    {
+      "name": "SystemConfigs",
+      "description": "Configurações de sistema da empresa: catálogo definido no código, valores gravados por empresa, em lote."
     },
     {
       "name": "Upload",

@@ -8,6 +8,7 @@ export const userSelect = {
   image: true,
   phone: true,
   isActive: true,
+  idleTimeoutMinutes: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -33,7 +34,10 @@ export function toUserWithRoles({ userRoles, ...user }: UserWithRolesRow) {
   return { ...user, roles: userRoles.map((userRole) => userRole.role) };
 }
 
-/** Colunas devolvidas na sessão (login, register, /me). `userSummarySchema` soma a elas as `permissions` efetivas. */
+/**
+ * Colunas devolvidas na sessão (login, register, /me). `userSummarySchema` soma a elas as `permissions` efetivas e o
+ * `idleTimeoutMinutes` já resolvido.
+ */
 export const userSummarySelect = {
   id: true,
   name: true,

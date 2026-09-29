@@ -37,6 +37,7 @@ describe("POST /api/client/session/register", () => {
         email: "carla@example.com",
         image: null,
         permissions: [...PERMISSION_NAMES].toSorted(),
+        idleTimeoutMinutes: 20,
       },
     });
     expect(response.cookies.find((cookie) => cookie.name === "token")?.value).toBeTruthy();

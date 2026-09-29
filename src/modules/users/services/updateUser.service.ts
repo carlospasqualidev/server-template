@@ -23,6 +23,7 @@ export async function updateUserService({ companyId, userId, data }: UpdateUserI
     ...(data.phone !== undefined && { phone: data.phone }),
     ...(data.image !== undefined && { image: data.image }),
     ...(data.isActive !== undefined && { isActive: data.isActive }),
+    ...(data.idleTimeoutMinutes !== undefined && { idleTimeoutMinutes: data.idleTimeoutMinutes }),
     ...(data.password !== undefined && { password: await hashPassword(data.password) }),
   };
 

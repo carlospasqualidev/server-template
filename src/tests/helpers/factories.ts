@@ -2,6 +2,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_ROLE, type PermissionName } from "@/modules/permissions/permission.catalog";
 import { createAdminRoleService } from "@/modules/permissions/services/createAdminRole.service";
+import { type SystemConfigKey } from "@/modules/systemConfigs/systemConfig.catalog";
 
 export const DEFAULT_PASSWORD = "123123123";
 
@@ -87,6 +88,8 @@ interface UserOverrides {
   phone?: string | null;
   image?: string | null;
   isActive?: boolean;
+  /** Tempo de inatividade próprio; ausente ou null herda o da empresa. */
+  idleTimeoutMinutes?: number | null;
   deletedAt?: Date | null;
   /**
    * Ausente: o usuário recebe o cargo `Administrador` da empresa (catálogo inteiro). `[]`: sem cargo. Lista: um cargo
@@ -128,8 +131,21 @@ export async function createUser(overrides: UserOverrides = {}) {
       phone: overrides.phone ?? null,
       image: overrides.image ?? null,
       isActive: overrides.isActive ?? true,
+      idleTimeoutMinutes: overrides.idleTimeoutMinutes ?? null,
       deletedAt: overrides.deletedAt ?? null,
       userRoles: { createMany: { data: roleIds.map((roleId) => ({ roleId })) } },
     },
   });
+}
+
+interface SystemConfigOverrides {
+  companyId: string;
+  key: SystemConfigKey;
+  /** Gravado como está, sem passar pela validação da rota (para simular valor antigo ou inválido). */
+  value: string;
+}
+
+/** Valor de configuração gravado pela empresa. */
+export async function createSystemConfig({ companyId, key, value }: SystemConfigOverrides) {
+  return prisma.systemConfig.create({ data: { companyId, key, value } });
 }

@@ -43,6 +43,7 @@ describe("POST /api/client/users", () => {
         email: "novo@example.com",
         phone: "48999999999",
         isActive: true,
+        idleTimeoutMinutes: null,
       }),
     });
 
@@ -108,5 +109,61 @@ describe("POST /api/client/users", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().issues[0].path).toBe("phone");
+  });
+
+  describe("tempo de inatividade próprio (idleTimeoutMinutes)", () => {
+    const newUserPayload = {
+      name: "Fulano",
+      email: "inatividade@example.com",
+      password: "senha-forte-1",
+      confirmPassword: "senha-forte-1",
+    };
+
+    it("grava o tempo informado e o devolve no usuário", async () => {
+      const admin = await createUser();
+
+      const response = await app.inject({
+        method: "POST",
+        url: USERS_URL,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { ...newUserPayload, idleTimeoutMinutes: 45 },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().user.idleTimeoutMinutes).toBe(45);
+      const created = await prisma.user.findUniqueOrThrow({ where: { email: "inatividade@example.com" } });
+      expect(created.idleTimeoutMinutes).toBe(45);
+    });
+
+    it("null herda o da empresa", async () => {
+      const admin = await createUser();
+
+      const response = await app.inject({
+        method: "POST",
+        url: USERS_URL,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { ...newUserPayload, idleTimeoutMinutes: null },
+      });
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json().user.idleTimeoutMinutes).toBeNull();
+    });
+
+    it.each([0, 481, 12.5])("%s fora da faixa responde 400 e não cria", async (idleTimeoutMinutes) => {
+      const admin = await createUser();
+
+      const response = await app.inject({
+        method: "POST",
+        url: USERS_URL,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { ...newUserPayload, idleTimeoutMinutes },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues).toEqual([
+        { path: "idleTimeoutMinutes", message: "Informe um tempo de inatividade inteiro de 1 a 480 minutos." },
+      ]);
+      expect(await prisma.user.count({ where: { email: "inatividade@example.com" } })).toBe(0);
+    });
   });
 });

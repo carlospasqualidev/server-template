@@ -10,7 +10,7 @@ import {
   phoneSchema,
   urlSchema,
 } from "@/lib/validation/schemas";
-import { userSchema } from "@/modules/users/schemas/user.schemas";
+import { idleTimeoutMinutesBodySchema, userSchema } from "@/modules/users/schemas/user.schemas";
 
 export const createUserBodySchema = z
   .object({
@@ -20,6 +20,9 @@ export const createUserBodySchema = z
     confirmPassword: z.string({ message: "Confirme a senha." }).describe("Confirmação da senha."),
     phone: phoneSchema.nullish().describe("Telefone."),
     image: urlSchema.nullish().describe("URL da foto (use a rota de upload antes)."),
+    idleTimeoutMinutes: idleTimeoutMinutesBodySchema
+      .optional()
+      .describe("Tempo de inatividade próprio, em minutos (1 a 480). Ausente ou null: herda o da empresa."),
   })
   .refine(passwordsMatch, passwordsMatchIssue);
 

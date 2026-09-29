@@ -23,26 +23,29 @@ model Company {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  users User[]
-  roles Role[]
+  users         User[]
+  roles         Role[]
+  systemConfigs SystemConfig[]
 
   @@index([deletedAt])
   @@map("companies")
 }
 
 /// Usuario autenticavel. Exclusao e logica (`deletedAt`); `email` continua unico mesmo apos exclusao.
+/// `idleTimeoutMinutes` e o tempo de inatividade proprio do usuario; null herda `security.idleTimeoutMinutes` da empresa.
 model User {
-  id        String    @id @default(uuid(7))
-  companyId String
-  name      String
-  email     String    @unique
-  password  String
-  image     String?
-  phone     String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  id                 String    @id @default(uuid(7))
+  companyId          String
+  name               String
+  email              String    @unique
+  password           String
+  image              String?
+  phone              String?
+  isActive           Boolean   @default(true)
+  idleTimeoutMinutes Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
 
   company   Company    @relation(fields: [companyId], references: [id])
   userRoles UserRole[]
@@ -122,4 +125,21 @@ model UserRole {
   @@unique([userId, roleId])
   @@index([roleId])
   @@map("user_roles")
+}
+
+/// Valor de configuracao de sistema gravado por uma empresa. As definicoes (rotulo, tipo, padrao, regra) vivem no codigo,
+/// em `src/modules/systemConfigs/systemConfig.catalog.ts`; aqui fica so o valor que a empresa gravou, sempre como texto.
+/// Sem linha, vale o padrao do catalogo. O indice unico `[companyId, key]` tambem atende as consultas por `companyId`.
+model SystemConfig {
+  id        String   @id @default(uuid(7))
+  companyId String
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, key])
+  @@map("system_configs")
 }

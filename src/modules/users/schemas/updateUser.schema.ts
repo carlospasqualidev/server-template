@@ -9,7 +9,7 @@ import {
   phoneSchema,
   urlSchema,
 } from "@/lib/validation/schemas";
-import { userParamsSchema, userSchema } from "@/modules/users/schemas/user.schemas";
+import { idleTimeoutMinutesBodySchema, userParamsSchema, userSchema } from "@/modules/users/schemas/user.schemas";
 
 /** Atualização parcial: só os campos enviados mudam. `email` é identidade e não muda por aqui. */
 export const updateUserBodySchema = z
@@ -18,6 +18,9 @@ export const updateUserBodySchema = z
     phone: phoneSchema.nullable().optional().describe("Telefone (null limpa)."),
     image: urlSchema.nullable().optional().describe("URL da foto (null limpa)."),
     isActive: z.boolean().optional().describe("false bloqueia o acesso."),
+    idleTimeoutMinutes: idleTimeoutMinutesBodySchema
+      .optional()
+      .describe("Tempo de inatividade próprio, em minutos (1 a 480). null volta a herdar o da empresa."),
     password: passwordSchema.optional().describe("Nova senha."),
     confirmPassword: z.string().optional().describe("Confirmação da nova senha."),
   })

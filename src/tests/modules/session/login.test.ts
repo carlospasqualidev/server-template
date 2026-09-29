@@ -38,6 +38,7 @@ describe("POST /api/client/session/login", () => {
         email: "maria@example.com",
         image: null,
         permissions: [...PERMISSION_NAMES].toSorted(),
+        idleTimeoutMinutes: 20,
       },
     });
 

@@ -88,7 +88,7 @@ Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm per
 | `POST`   | `/session/login`       | não       |                                                       | Autentica e grava o cookie                                                    |
 | `POST`   | `/session/register`    | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
 | `POST`   | `/session/logout`      | não       |                                                       | Limpa o cookie                                                                |
-| `GET`    | `/users/me`            | sim       |                                                       | Usuário da sessão, com `permissions`                                          |
+| `GET`    | `/users/me`            | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                   |
 | `GET`    | `/users`               | sim       | `backoffice.users.read`                               | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
 | `GET`    | `/users/:userId`       | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa)                                                  |
 | `POST`   | `/users`               | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                       |
@@ -104,6 +104,8 @@ Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm per
 | `DELETE` | `/roles/:roleId`       | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                          |
 | `GET`    | `/roles/:roleId/users` | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                   |
 | `PUT`    | `/roles/:roleId/users` | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                   |
+| `GET`    | `/system-configs`      | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)          |
+| `PATCH`  | `/system-configs`      | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada     |
 | `POST`   | `/upload/file`         | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                     |
 
 Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `issues: [{ path, message }]`. O contrato completo, gerado dos schemas, fica em [`docs/openapi.json`](docs/openapi.json).
@@ -113,6 +115,14 @@ Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `iss
 Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e antes de cada teste; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. O register espera uma sincronização em andamento antes de criar o `Administrador` da empresa nova, para ele nascer com o catálogo completo.
 
 Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do catálogo (qualquer escrita de um grupo inclui a leitura do mesmo grupo) e usuários. O cargo `Administrador` não é editado, excluído nem copiado; a empresa nunca fica sem um administrador ativo; ninguém altera os próprios cargos; e ninguém concede a um cargo, ou atribui a alguém, permissão que não possui (o `Administrador` só é dado ou tirado por outro administrador). Regras, passo a passo para uma permissão nova e a gestão de cargos: [`CLAUDE.md`](CLAUDE.md#permissões-e-cargos).
+
+## Sessão e timeout de inatividade
+
+Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie vale até `SESSION_TTL_HOURS`).
+
+## Configurações de sistema
+
+Cada empresa ajusta as configurações numa tela única. As definições (rótulo, tipo, padrão e regra de validação) ficam no código, em `src/modules/systemConfigs/systemConfig.catalog.ts`; o banco guarda só os valores que a empresa gravou, e o que não foi gravado vale o padrão. `value` trafega sempre como texto. A gravação é em lote e atômica: um item inválido responde 400 e nada é gravado. Chaves iniciais: `app.name`, `app.supportEmail`, `security.idleTimeoutMinutes` (padrão 20, de 1 a 480) e `notifications.email`. Como acrescentar uma chave: [`CLAUDE.md`](CLAUDE.md#configurações-de-sistema).
 
 ## Estrutura
 
@@ -131,6 +141,7 @@ src/
     upload/         arquivo → S3
     permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
     roles/          gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo
+    systemConfigs/  configurações por empresa: catálogo no código, leitura, gravação em lote, timeout de inatividade
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado

@@ -65,6 +65,7 @@ describe("rotas protegidas (hook requireSession)", () => {
         email: "ativo@example.com",
         image: null,
         permissions: [...PERMISSION_NAMES].toSorted(),
+        idleTimeoutMinutes: 20,
       },
     });
   });
