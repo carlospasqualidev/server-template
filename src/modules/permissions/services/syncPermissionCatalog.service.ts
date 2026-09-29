@@ -21,8 +21,13 @@ interface SyncPermissionCatalogResult {
 
 type PermissionMetadata = Omit<PermissionDefinition, "name">;
 
-/** Nome da trava consultiva (`pg_advisory_xact_lock`) que serializa as sincronizações no mesmo banco. */
-const SYNC_LOCK_NAME = "permission-catalog-sync";
+/**
+ * Nome da trava consultiva do catálogo (`hashtext` dele é a chave). A sincronização a toma exclusiva
+ * (`pg_advisory_xact_lock`): serializa as sincronizações no mesmo banco. Quem cria o cargo `Administrador` de uma
+ * empresa nova (register) a toma compartilhada (`pg_advisory_xact_lock_shared`): espera a sincronização em andamento
+ * confirmar e só então lê o catálogo, sem esperar os outros registers.
+ */
+export const PERMISSION_CATALOG_LOCK_NAME = "permission-catalog-sync";
 
 /**
  * O `timeout` padrão da transação interativa (5 s) conta também a espera pela trava: a instância que aguarda outra
@@ -70,7 +75,7 @@ export async function syncPermissionCatalogService({
   return prisma.$transaction(async (tx) => {
     // `$executeRaw` porque `pg_advisory_xact_lock` devolve `void`, que o `$queryRaw` não desserializa. A trava se
     // solta sozinha no fim da transação.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SYNC_LOCK_NAME}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${PERMISSION_CATALOG_LOCK_NAME}))`;
 
     const { count: removed } = await tx.permission.deleteMany({ where: { name: { in: [...obsoleteNames] } } });
 

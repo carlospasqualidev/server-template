@@ -10,6 +10,7 @@ const tags: { name: string; description: string }[] = [
   { name: "Health", description: "Disponibilidade da API e do banco." },
   { name: "Session", description: "Autenticação e controle de sessão." },
   { name: "Users", description: "Usuários da empresa do usuário autenticado." },
+  { name: "Roles", description: "Cargos da empresa, os usuários de cada um e o catálogo de permissões." },
   { name: "Upload", description: "Envio de arquivos para o storage." },
 ];
 

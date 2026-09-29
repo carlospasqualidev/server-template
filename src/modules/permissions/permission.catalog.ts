@@ -114,6 +114,18 @@ export const PERMISSION_CATALOG = [
 /** Nome de permissão válido. `requirePermission` só aceita estes: nome fora do catálogo não compila. */
 export type PermissionName = (typeof PERMISSION_CATALOG)[number]["name"];
 
+/** Módulo usado no catálogo. `PERMISSION_MODULES` só aceita estes: módulo fora do catálogo não compila. */
+export type PermissionModule = (typeof PERMISSION_CATALOG)[number]["module"];
+
+/**
+ * Módulos do catálogo, na ordem da tela de cargos, com o rótulo pt-BR do cabeçalho de cada um
+ * (`GET /roles/permissions`). Módulo novo no catálogo entra aqui também; o que faltar sai por último, rotulado pelo
+ * próprio nome.
+ */
+export const PERMISSION_MODULES: readonly { module: PermissionModule; label: string }[] = [
+  { module: "backoffice", label: "Backoffice" },
+];
+
 /** Todos os nomes do catálogo, na ordem de declaração. */
 export const PERMISSION_NAMES: readonly PermissionName[] = PERMISSION_CATALOG.map((permission) => permission.name);
 

@@ -33,7 +33,27 @@ export async function findAdminRole(companyId: string) {
   return prisma.role.findUniqueOrThrow({ where: { companyId_name: { companyId, name: ADMIN_ROLE.name } } });
 }
 
+/** IDs das permissões do catálogo, na ordem dos nomes informados (o que `permissionIds` recebe). */
+export async function findPermissionIds(names: readonly PermissionName[]): Promise<string[]> {
+  const permissions = await Promise.all(
+    names.map((name) => prisma.permission.findUniqueOrThrow({ where: { name }, select: { id: true } })),
+  );
+
+  return permissions.map((permission) => permission.id);
+}
+
+/** Nomes das permissões gravadas no cargo, em ordem alfabética. */
+export async function findRolePermissionNames(roleId: string): Promise<string[]> {
+  const rolePermissions = await prisma.rolePermission.findMany({
+    where: { roleId },
+    select: { permission: { select: { name: true } } },
+  });
+
+  return rolePermissions.map((rolePermission) => rolePermission.permission.name).toSorted();
+}
+
 interface RoleOverrides {
+  description?: string | null;
   companyId?: string;
   name?: string;
   permissions?: readonly PermissionName[];
@@ -52,6 +72,7 @@ export async function createRole(overrides: RoleOverrides = {}) {
     data: {
       companyId,
       name: overrides.name ?? `Cargo ${nextSequence()}`,
+      description: overrides.description ?? null,
       deletedAt: overrides.deletedAt ?? null,
       rolePermissions: { createMany: { data: permissions.map((permission) => ({ permissionId: permission.id })) } },
     },

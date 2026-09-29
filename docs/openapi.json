@@ -2209,6 +2209,2994 @@
         }
       }
     },
+    "/api/client/users/{userId}/roles": {
+      "put": {
+        "summary": "Define os cargos de um usuário",
+        "tags": [
+          "Users"
+        ],
+        "description": "Exige `backoffice.users.update`. Substitui os cargos do usuário. Alterar os próprios cargos ou retirar o cargo `Administrador` do último administrador ativo da empresa responde 400; atribuir cargo com permissão que o autor não possui, ou atribuir ou retirar o `Administrador` sem ser Administrador, 403; usuário ou cargo de outra empresa (ou excluído), 404.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roleIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": "Conjunto completo de cargos do usuário (substitui o atual). `[]` deixa o usuário sem cargo."
+                  }
+                },
+                "required": [
+                  "roleIds"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "description": "ID do usuário."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do usuário."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "E-mail."
+                        },
+                        "image": {
+                          "description": "URL da foto, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "phone": {
+                          "description": "Telefone, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isActive": {
+                          "type": "boolean",
+                          "description": "Usuário bloqueado quando false."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Identificador do cargo."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome do cargo."
+                              },
+                              "isSystem": {
+                                "type": "boolean",
+                                "description": "Cargo de sistema (`Administrador`)."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "isSystem"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Cargos do usuário, em ordem alfabética."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "image",
+                        "phone",
+                        "isActive",
+                        "createdAt",
+                        "updatedAt",
+                        "roles"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/roles": {
+      "get": {
+        "summary": "Lista os cargos da empresa",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Paginação 0-based, ordenação por allowlist e busca por nome, com a contagem de permissões e de usuários de cada cargo. Cargos excluídos não aparecem. Exige `backoffice.roles.read`.",
+        "parameters": [
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Página, começando em 0."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "description": "Itens por página (máx. 100)."
+          },
+          {
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "createdAt"
+              ]
+            },
+            "in": "query",
+            "name": "orderBy",
+            "required": false,
+            "description": "Campo de ordenação: name, createdAt."
+          },
+          {
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "description": "Direção da ordenação."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Busca por nome (contém, sem diferenciar maiúsculas)."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Identificador do cargo."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Nome, único na empresa."
+                          },
+                          "description": {
+                            "description": "Descrição, ou null.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "isSystem": {
+                            "type": "boolean",
+                            "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                          },
+                          "usersCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "permissionsCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Permissões do cargo."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "isSystem",
+                          "usersCount",
+                          "createdAt",
+                          "updatedAt",
+                          "permissionsCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de registros que atendem ao filtro (para paginação)."
+                    }
+                  },
+                  "required": [
+                    "roles",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria um cargo na empresa",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.create`. Nome repetido na empresa, inclusive de cargo excluído, responde 409; permissão inexistente, 400; permissão que o autor não possui (contando o `read` incluído pela expansão), 403.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120,
+                    "description": "Nome do cargo, único na empresa (inclusive entre os cargos excluídos)."
+                  },
+                  "description": {
+                    "description": "Descrição (vazia, null ou ausente fica sem descrição).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionIds": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": "IDs das permissões (os de `GET /roles/permissions`). Qualquer escrita de um grupo inclui, ao salvar, o `read` do mesmo grupo. Só entram permissões que o autor possui (403)."
+                  }
+                },
+                "required": [
+                  "name",
+                  "permissionIds"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do cargo."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome, único na empresa."
+                        },
+                        "description": {
+                          "description": "Descrição, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isSystem": {
+                          "type": "boolean",
+                          "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                        },
+                        "usersCount": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "ID da permissão."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome da permissão."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Permissões do cargo, em ordem alfabética do nome."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "isSystem",
+                        "usersCount",
+                        "createdAt",
+                        "updatedAt",
+                        "permissions"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/roles/permissions": {
+      "get": {
+        "summary": "Catálogo de permissões, agrupado para a tela de cargos",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.read`. Árvore módulo → grupo → permissões, em ordem de exibição (`sortOrder`). O catálogo é global: igual para toda empresa.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "module": {
+                            "type": "string",
+                            "description": "Chave do módulo."
+                          },
+                          "moduleLabel": {
+                            "type": "string",
+                            "description": "Cabeçalho do módulo (pt-BR)."
+                          },
+                          "groups": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "groupLabel": {
+                                  "type": "string",
+                                  "description": "Cabeçalho do grupo (pt-BR)."
+                                },
+                                "permissions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "description": "ID da permissão (o que `permissionIds` recebe)."
+                                      },
+                                      "name": {
+                                        "type": "string",
+                                        "description": "Nome estável, `modulo.entidade.acao`."
+                                      },
+                                      "action": {
+                                        "type": "string",
+                                        "description": "Ação: `read` ou uma escrita (`create`, `update`, `delete`...)."
+                                      },
+                                      "label": {
+                                        "type": "string",
+                                        "description": "Rótulo do checkbox (pt-BR)."
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "name",
+                                      "action",
+                                      "label"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "groupLabel",
+                                "permissions"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "module",
+                          "moduleLabel",
+                          "groups"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "modules"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/roles/{roleId}": {
+      "get": {
+        "summary": "Busca um cargo por ID, com as permissões",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.read`.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do cargo."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome, único na empresa."
+                        },
+                        "description": {
+                          "description": "Descrição, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isSystem": {
+                          "type": "boolean",
+                          "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                        },
+                        "usersCount": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "ID da permissão."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome da permissão."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Permissões do cargo, em ordem alfabética do nome."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "isSystem",
+                        "usersCount",
+                        "createdAt",
+                        "updatedAt",
+                        "permissions"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Edita um cargo",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.update`. Substitui nome, descrição e o conjunto inteiro de permissões. O cargo de sistema não é editado (400); nome repetido, 409; acrescentar permissão que o autor não possui, 403 (manter ou retirar as que o cargo já tem é permitido).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120,
+                    "description": "Nome do cargo, único na empresa (inclusive entre os cargos excluídos)."
+                  },
+                  "description": {
+                    "description": "Descrição (vazia, null ou ausente fica sem descrição).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "permissionIds": {
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": "IDs das permissões (os de `GET /roles/permissions`). Qualquer escrita de um grupo inclui, ao salvar, o `read` do mesmo grupo. Só entram permissões que o autor possui (403)."
+                  }
+                },
+                "required": [
+                  "name",
+                  "permissionIds"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do cargo."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome, único na empresa."
+                        },
+                        "description": {
+                          "description": "Descrição, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isSystem": {
+                          "type": "boolean",
+                          "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                        },
+                        "usersCount": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "ID da permissão."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome da permissão."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Permissões do cargo, em ordem alfabética do nome."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "isSystem",
+                        "usersCount",
+                        "createdAt",
+                        "updatedAt",
+                        "permissions"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Exclui um cargo (exclusão lógica)",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.delete`. Cargo de sistema ou com usuários vinculados responde 400. O nome continua reservado na empresa.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Confirmação pronta para o usuário final."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/roles/{roleId}/copy": {
+      "post": {
+        "summary": "Copia um cargo",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.create`. Cria um cargo com a descrição e as permissões do original, sem os usuários, com o nome `\"<nome> (cópia)\"` (ou `(cópia 2)`, `(cópia 3)`... quando já existe). O cargo de sistema não é copiado (400); cargo com permissão que o autor não possui, 403; sem nome de cópia livre, 409.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do cargo."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome, único na empresa."
+                        },
+                        "description": {
+                          "description": "Descrição, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isSystem": {
+                          "type": "boolean",
+                          "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                        },
+                        "usersCount": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "ID da permissão."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome da permissão."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Permissões do cargo, em ordem alfabética do nome."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "isSystem",
+                        "usersCount",
+                        "createdAt",
+                        "updatedAt",
+                        "permissions"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/roles/{roleId}/users": {
+      "get": {
+        "summary": "Lista os usuários de um cargo",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.read` e `backoffice.users.read` (expõe nome e e-mail). Paginação 0-based, ordenação por allowlist e busca. Usuários bloqueados aparecem; excluídos, não.",
+        "parameters": [
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Página, começando em 0."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "description": "Itens por página (máx. 100)."
+          },
+          {
+            "schema": {
+              "default": "name",
+              "type": "string",
+              "enum": [
+                "name",
+                "email"
+              ]
+            },
+            "in": "query",
+            "name": "orderBy",
+            "required": false,
+            "description": "Campo de ordenação: name, email."
+          },
+          {
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "description": "Direção da ordenação."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Busca por nome ou e-mail (contém, sem diferenciar maiúsculas)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Identificador do usuário."
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Nome."
+                          },
+                          "email": {
+                            "type": "string",
+                            "description": "E-mail."
+                          },
+                          "image": {
+                            "description": "URL da foto, ou null.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "isActive": {
+                            "type": "boolean",
+                            "description": "Usuário bloqueado quando false (continua com o cargo)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "email",
+                          "image",
+                          "isActive"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de registros que atendem ao filtro (para paginação)."
+                    }
+                  },
+                  "required": [
+                    "users",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Define os usuários de um cargo",
+        "tags": [
+          "Roles"
+        ],
+        "description": "Exige `backoffice.roles.update` e `backoffice.users.update`. Substitui o conjunto de usuários do cargo. Incluir ou retirar a si mesmo responde 400; o cargo de sistema não muda por aqui (400: use os cargos de cada usuário). Incluir alguém num cargo com permissão que o autor não possui responde 403. Usuário de outra empresa responde 404.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userIds": {
+                    "maxItems": 1000,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "description": "Conjunto completo de usuários do cargo: quem estiver com o cargo e não vier na lista perde o cargo. `[]` esvazia o cargo."
+                  }
+                },
+                "required": [
+                  "userIds"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "roleId",
+            "required": true,
+            "description": "ID do cargo."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do cargo."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome, único na empresa."
+                        },
+                        "description": {
+                          "description": "Descrição, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "isSystem": {
+                          "type": "boolean",
+                          "description": "Cargo de sistema (`Administrador`): não é editado, excluído nem copiado, e os usuários dele só mudam pelos cargos de cada usuário."
+                        },
+                        "usersCount": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Usuários com o cargo (bloqueados contam; excluídos, não)."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "ID da permissão."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome da permissão."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Permissões do cargo, em ordem alfabética do nome."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "description",
+                        "isSystem",
+                        "usersCount",
+                        "createdAt",
+                        "updatedAt",
+                        "permissions"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "role"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/client/upload/file": {
       "post": {
         "summary": "Envia um arquivo para o storage",
@@ -2483,6 +5471,10 @@
     {
       "name": "Users",
       "description": "Usuários da empresa do usuário autenticado."
+    },
+    {
+      "name": "Roles",
+      "description": "Cargos da empresa, os usuários de cada um e o catálogo de permissões."
     },
     {
       "name": "Upload",

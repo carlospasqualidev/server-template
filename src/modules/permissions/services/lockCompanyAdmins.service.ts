@@ -13,6 +13,9 @@ interface LockCompanyAdminsInput {
  * escrita no mesmo `tx`: fora de transação a trava se solta na hora. Quem espera relê o estado já gravado por quem
  * travou antes (cada comando do READ COMMITTED lê o que já foi confirmado).
  *
+ * A mesma trava serializa as mudanças de vínculo entre usuários e cargos da empresa (cargos do usuário, usuários do
+ * cargo) com a exclusão de cargo: quem exclui relê, com a trava, se o cargo ganhou usuário nesse meio tempo.
+ *
  * `FOR NO KEY UPDATE` não conflita com o `FOR KEY SHARE` que a FK toma ao inserir usuário ou cargo na empresa: só
  * espera quem trava do mesmo jeito (ou altera a própria linha da empresa).
  */

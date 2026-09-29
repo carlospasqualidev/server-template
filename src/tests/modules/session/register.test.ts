@@ -1,10 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { type App } from "@/app";
+import { assertExists } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
+import { PERMISSION_CATALOG, PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
-import { createUser } from "@/tests/helpers/factories";
+import { createUser, findAdminRole } from "@/tests/helpers/factories";
+import { raceAgainstCatalogSync } from "@/tests/helpers/permissionCatalogLock";
 
 const REGISTER_URL = "/api/client/session/register";
 
@@ -71,6 +73,40 @@ describe("POST /api/client/session/register", () => {
       [...PERMISSION_NAMES].toSorted(),
     );
     expect(roles[0]?.userRoles).toEqual([{ userId: user.id }]);
+  });
+
+  it("durante uma sincronização que cria e remove permissões, espera e cria o Administrador com o catálogo novo", async () => {
+    const createdByTheSync = PERMISSION_CATALOG.find(
+      (definition) => definition.name === "backoffice.systemConfigs.update",
+    );
+    assertExists(createdByTheSync, "Permissão do catálogo");
+    // Estado anterior à versão nova: a permissão que a sincronização vai criar ainda não existe no banco.
+    await prisma.permission.delete({ where: { name: createdByTheSync.name } });
+
+    const response = await raceAgainstCatalogSync({
+      syncWrite: async (tx) => {
+        await tx.permission.create({ data: { ...createdByTheSync } });
+        await tx.permission.delete({ where: { name: "backoffice.audit.read" } });
+      },
+      operation: () =>
+        app.inject({
+          method: "POST",
+          url: REGISTER_URL,
+          payload: { name: "Eva", email: "eva@example.com", password: "senha-forte-1" },
+        }),
+    });
+
+    const expected = PERMISSION_NAMES.filter((permissionName) => permissionName !== "backoffice.audit.read").toSorted();
+    expect(response.statusCode).toBe(201);
+    expect(response.json().user.permissions).toEqual(expected);
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: "eva@example.com" } });
+    const adminRole = await findAdminRole(user.companyId);
+    const adminPermissions = await prisma.rolePermission.findMany({
+      where: { roleId: adminRole.id },
+      select: { permission: { select: { name: true } } },
+    });
+    expect(adminPermissions.map((item) => item.permission.name).toSorted()).toEqual(expected);
   });
 
   it("e-mail já cadastrado responde 409", async () => {

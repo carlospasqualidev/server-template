@@ -83,24 +83,36 @@ Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
 Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm permissão respondem 403 sem ela.
 
-| Método   | Rota                | Protegida | Permissão                 | Descrição                                                                     |
-| -------- | ------------------- | --------- | ------------------------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/session/login`    | não       |                           | Autentica e grava o cookie                                                    |
-| `POST`   | `/session/register` | não       |                           | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
-| `POST`   | `/session/logout`   | não       |                           | Limpa o cookie                                                                |
-| `GET`    | `/users/me`         | sim       |                           | Usuário da sessão, com `permissions`                                          |
-| `GET`    | `/users`            | sim       | `backoffice.users.read`   | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
-| `GET`    | `/users/:userId`    | sim       | `backoffice.users.read`   | Busca por id (mesma empresa)                                                  |
-| `POST`   | `/users`            | sim       | `backoffice.users.create` | Cria usuário na empresa                                                       |
-| `PATCH`  | `/users/:userId`    | sim       | `backoffice.users.update` | Atualização parcial                                                           |
-| `DELETE` | `/users/:userId`    | sim       | `backoffice.users.delete` | Exclusão lógica                                                               |
-| `POST`   | `/upload/file`      | sim       |                           | Envia um arquivo (campo `file`) para o S3                                     |
+| Método   | Rota                   | Protegida | Permissão                                             | Descrição                                                                     |
+| -------- | ---------------------- | --------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `POST`   | `/session/login`       | não       |                                                       | Autentica e grava o cookie                                                    |
+| `POST`   | `/session/register`    | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
+| `POST`   | `/session/logout`      | não       |                                                       | Limpa o cookie                                                                |
+| `GET`    | `/users/me`            | sim       |                                                       | Usuário da sessão, com `permissions`                                          |
+| `GET`    | `/users`               | sim       | `backoffice.users.read`                               | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
+| `GET`    | `/users/:userId`       | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa)                                                  |
+| `POST`   | `/users`               | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                       |
+| `PATCH`  | `/users/:userId`       | sim       | `backoffice.users.update`                             | Atualização parcial                                                           |
+| `DELETE` | `/users/:userId`       | sim       | `backoffice.users.delete`                             | Exclusão lógica                                                               |
+| `PUT`    | `/users/:userId/roles` | sim       | `backoffice.users.update`                             | Define os cargos do usuário                                                   |
+| `GET`    | `/roles/permissions`   | sim       | `backoffice.roles.read`                               | Catálogo de permissões agrupado (módulo → grupo → permissões)                 |
+| `GET`    | `/roles`               | sim       | `backoffice.roles.read`                               | Lista paginada de cargos (`page`, `pageSize`, `orderBy`, `order`, `search`)   |
+| `GET`    | `/roles/:roleId`       | sim       | `backoffice.roles.read`                               | Cargo com as permissões                                                       |
+| `POST`   | `/roles`               | sim       | `backoffice.roles.create`                             | Cria cargo                                                                    |
+| `POST`   | `/roles/:roleId/copy`  | sim       | `backoffice.roles.create`                             | Copia cargo (permissões e descrição, sem usuários)                            |
+| `PUT`    | `/roles/:roleId`       | sim       | `backoffice.roles.update`                             | Edita nome, descrição e o conjunto de permissões                              |
+| `DELETE` | `/roles/:roleId`       | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                          |
+| `GET`    | `/roles/:roleId/users` | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                   |
+| `PUT`    | `/roles/:roleId/users` | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                   |
+| `POST`   | `/upload/file`         | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                     |
 
 Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `issues: [{ path, message }]`. O contrato completo, gerado dos schemas, fica em [`docs/openapi.json`](docs/openapi.json).
 
 ## Permissões
 
-Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e antes de cada teste; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. Regras e passo a passo para uma permissão nova: [`CLAUDE.md`](CLAUDE.md#permissões-rbac-no-padrão-do-sul-oxidos).
+Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e antes de cada teste; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. O register espera uma sincronização em andamento antes de criar o `Administrador` da empresa nova, para ele nascer com o catálogo completo.
+
+Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do catálogo (qualquer escrita de um grupo inclui a leitura do mesmo grupo) e usuários. O cargo `Administrador` não é editado, excluído nem copiado; a empresa nunca fica sem um administrador ativo; ninguém altera os próprios cargos; e ninguém concede a um cargo, ou atribui a alguém, permissão que não possui (o `Administrador` só é dado ou tirado por outro administrador). Regras, passo a passo para uma permissão nova e a gestão de cargos: [`CLAUDE.md`](CLAUDE.md#permissões-e-cargos).
 
 ## Estrutura
 
@@ -118,6 +130,7 @@ src/
     users/          CRUD de referência (paginação, busca, allowlist de ordenação, tenant, soft delete)
     upload/         arquivo → S3
     permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
+    roles/          gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado

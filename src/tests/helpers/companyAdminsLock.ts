@@ -19,7 +19,8 @@ interface RaceAgainstAdminChangeInput<T> {
  * Reproduz de forma determinística a corrida do último administrador: uma transação trava os administradores da
  * empresa (`lockCompanyAdminsService`), dispara `operation`, espera `HEAD_START_MS`, grava `lockedWrite` e confirma.
  * Com a trava, `operation` espera e relê o estado já confirmado; sem ela, faria a checagem antes da outra escrita.
- * Devolve o resultado de `operation`.
+ * Serve também para as outras regras que tomam a mesma trava (ex.: excluir cargo enquanto alguém o vincula).
+ * Devolve o resultado de `operation`; falha da transação que segura a trava, ou da operação, rejeita a chamada.
  */
 export async function raceAgainstAdminChange<T>({
   companyId,
@@ -38,9 +39,9 @@ export async function raceAgainstAdminChange<T>({
     await lockedWrite(tx);
   });
 
-  await locked;
-  const result = operation();
-  await holder;
+  // `race` com `holder`: se a transação falhar antes de travar, a chamada rejeita em vez de esperar para sempre.
+  await Promise.race([locked, holder]);
+  const [result] = await Promise.all([operation(), holder]);
 
   return result;
 }

@@ -13,7 +13,7 @@ const USERS_URL = "/api/client/users";
 interface RouteCase {
   route: string;
   permission: PermissionName;
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   url: (targetId: string) => string;
   payload?: Record<string, unknown>;
   successStatus: number;
@@ -55,6 +55,14 @@ const routeCases: RouteCase[] = [
     permission: "backoffice.users.delete",
     method: "DELETE",
     url: (targetId) => `${USERS_URL}/${targetId}`,
+    successStatus: 200,
+  },
+  {
+    route: "PUT /users/:userId/roles",
+    permission: "backoffice.users.update",
+    method: "PUT",
+    url: (targetId) => `${USERS_URL}/${targetId}/roles`,
+    payload: { roleIds: [] },
     successStatus: 200,
   },
 ];
