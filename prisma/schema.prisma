@@ -1,0 +1,270 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String  @id @default(uuid())
+  image     String
+  name      String
+  email     String  @unique
+  phone     String?
+  isActive  Boolean @default(true)
+  password  String
+  username  String  @unique
+  companyId String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  accessLogs      AccessLog[]
+  customFields    CustomField[]
+  customFieldLogs CustomFieldLog[]
+
+  @@map("users")
+}
+
+model AccessLog {
+  id String @id @default(uuid())
+
+  userId String
+  date   DateTime @default(now())
+
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("accessLogs")
+}
+
+model Company {
+  id    String @id @default(uuid())
+  image String
+  name  String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  users        User[]
+  persons      Person[]
+  customFields CustomField[]
+
+  @@map("companies")
+}
+
+model Person {
+  id          String  @id @default(uuid())
+  companyId   String
+  displayName String
+  observation String?
+  image       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  natural   NaturalPerson?
+  legal     LegalPerson?
+  addresses PersonAddress[]
+  emails    PersonEmail[]
+  phones    PersonPhone[]
+
+  @@map("persons")
+}
+
+model NaturalPerson {
+  id        String    @id @default(uuid())
+  personId  String    @unique
+  cpf       String?   @unique
+  fullName  String
+  genderId  String?
+  birthDate DateTime? @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person       Person              @relation(fields: [personId], references: [id])
+  gender       Gender?             @relation(fields: [genderId], references: [id])
+  partnerships PersonPartnership[]
+
+  @@map("naturalPersons")
+}
+
+model LegalPerson {
+  id        String  @id @default(uuid())
+  personId  String  @unique
+  cnpj      String? @unique
+  legalName String
+  tradeName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person       Person              @relation(fields: [personId], references: [id])
+  partnerships PersonPartnership[]
+
+  @@map("legalPersons")
+}
+
+model PersonAddress {
+  id       String @id @default(uuid())
+  personId String
+
+  cep          String?
+  street       String?
+  neighborhood String?
+  number       String?
+  city         String?
+  state        String?
+  complement   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person Person @relation(fields: [personId], references: [id])
+
+  @@map("personAddresses")
+}
+
+model PersonEmail {
+  id String @id @default(uuid())
+
+  personId String
+  email    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person Person @relation(fields: [personId], references: [id])
+
+  @@map("personEmails")
+}
+
+model PersonPhone {
+  id String @id @default(uuid())
+
+  personId String
+  phone    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person Person @relation(fields: [personId], references: [id])
+
+  @@map("personPhones")
+}
+
+model Gender {
+  id   String @id @default(uuid())
+  name String
+
+  naturalPersons NaturalPerson[]
+
+  @@map("genders")
+}
+
+model PersonPartnership {
+  legalPersonId   String
+  naturalPersonId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  legalPerson   LegalPerson   @relation(fields: [legalPersonId], references: [id])
+  naturalPerson NaturalPerson @relation(fields: [naturalPersonId], references: [id])
+
+  @@id([legalPersonId, naturalPersonId])
+  @@map("personPartnerships")
+}
+
+model CustomField {
+  id         String                @id @default(uuid())
+  companyId  String
+  title      String
+  personType CustomFieldPersonType
+  fieldType  FieldType
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  deletedAt  DateTime?
+
+  authorId String
+  author   User             @relation(fields: [authorId], references: [id])
+  logs     CustomFieldLog[]
+
+  selectOptions SelectOption[]
+  fileTypes     CustomFieldFileType[]
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("customFields")
+}
+
+model CustomFieldFileType {
+  id            String   @id @default(uuid())
+  customFieldId String
+  type          FileType
+
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@map("customFieldFileTypes")
+}
+
+model SelectOption {
+  id            String      @id @default(uuid())
+  label         String
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@map("selectOptions")
+}
+
+model CustomFieldLog {
+  id            String      @id @default(uuid())
+  customFieldId String
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  editorId String
+  editor   User   @relation(fields: [editorId], references: [id])
+
+  editedAt DateTime @default(now())
+
+  oldData Json?
+  newData Json?
+
+  @@map("customFieldLogs")
+}
+
+// ENUMS
+
+enum CustomFieldPersonType {
+  NATURAL
+  LEGAL
+  BOTH
+}
+
+enum FieldType {
+  STRING
+  NUMBER
+  DATE
+  DATETIME
+  CHECKBOX
+  FILE
+  SELECT
+}
+
+enum FileType {
+  PHOTO
+  VIDEO
+  PDF
+  ALL
+}
