@@ -51,6 +51,7 @@ describe("PUT /api/client/users/:userId/roles", () => {
         id: target.id,
         email: target.email,
         isActive: true,
+        lastLoginAt: null,
         roles: [
           { id: audit.id, name: "Auditoria", isSystem: false },
           { id: support.id, name: "Suporte", isSystem: false },

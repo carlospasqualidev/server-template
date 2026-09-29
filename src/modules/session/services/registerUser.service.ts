@@ -6,11 +6,12 @@ import { effectivePermissionsSelect, toPermissionNames } from "@/modules/permiss
 import { createAdminRoleService } from "@/modules/permissions/services/createAdminRole.service";
 import { PERMISSION_CATALOG_LOCK_NAME } from "@/modules/permissions/services/syncPermissionCatalog.service";
 import { type RegisterBody } from "@/modules/session/schemas/register.schema";
+import { recordLastLoginService } from "@/modules/session/services/recordLastLogin.service";
 import { resolveIdleTimeoutMinutesService } from "@/modules/systemConfigs/services/resolveIdleTimeoutMinutes.service";
 
 /**
- * Cria a empresa, o cargo `Administrador` dela e o usuário vinculado ao cargo, numa transação, com o registro da
- * criação do usuário na trilha de auditoria.
+ * Cria a empresa, o cargo `Administrador` dela e o usuário vinculado ao cargo, numa transação, com o último acesso
+ * gravado e o registro da criação do usuário na trilha de auditoria.
  */
 export async function registerUserService({ name, email, password }: RegisterBody) {
   const emailInUse = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -49,6 +50,9 @@ export async function registerUserService({ name, email, password }: RegisterBod
         userRoles: effectivePermissionsSelect({ companyId: company.id }),
       },
     });
+
+    // O register abre a sessão: conta como o primeiro acesso, pelo mesmo caminho do login (sem tocar o `updatedAt`).
+    await recordLastLoginService({ companyId: company.id, userId: created.id }, tx);
 
     // Autor = o próprio usuário: a rota é pública, a sessão só nasce com a resposta.
     await recordAuditService(

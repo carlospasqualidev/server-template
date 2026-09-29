@@ -3,6 +3,7 @@ import { z } from "zod";
 import { IDLE_TIMEOUT_MINUTES_RANGE } from "@/config/constants";
 import { dateTimeOutputSchema } from "@/lib/http/responses";
 import { idSchema } from "@/lib/validation/schemas";
+import { roleSummarySchema } from "@/modules/roles/schemas/role.schemas";
 
 const userIdentitySchema = z.object({
   id: z.string().describe("Identificador do usuário."),
@@ -28,10 +29,12 @@ export const userSummarySchema = userIdentitySchema.extend({
     .meta({ examples: [20] }),
 });
 
-/** Forma completa do usuário, usada no CRUD. */
+/** Forma completa do usuário, usada no CRUD (lista, detalhe, criação, edição). */
 export const userSchema = userIdentitySchema.extend({
   phone: z.string().nullable().describe("Telefone, ou null."),
-  isActive: z.boolean().describe("Usuário bloqueado quando false."),
+  isActive: z
+    .boolean()
+    .describe("Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."),
   idleTimeoutMinutes: z
     .number()
     .int()
@@ -39,6 +42,14 @@ export const userSchema = userIdentitySchema.extend({
     .describe(
       "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão.",
     ),
+  lastLoginAt: dateTimeOutputSchema
+    .nullable()
+    .describe(
+      "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou.",
+    ),
+  roles: z
+    .array(roleSummarySchema.pick({ id: true, name: true }))
+    .describe("Cargos do usuário (não excluídos, da empresa dele), em ordem alfabética do nome. `[]` sem cargo."),
   createdAt: dateTimeOutputSchema,
   updatedAt: dateTimeOutputSchema,
 });

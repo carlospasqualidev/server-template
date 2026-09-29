@@ -76,6 +76,16 @@ describe("computeChangedFields", () => {
     ).toEqual(["name", "phone", "legacy", "extra"]);
   });
 
+  it("lista de primitivos que fica vazia: o campo entra nos alterados e a chave sai do depois", () => {
+    const before = pickAuditable({ name: "Ana", tags: ["vip", "novo"] });
+    const after = pickAuditable({ name: "Ana", tags: [] });
+
+    expect(before).toEqual({ name: "Ana", tags: "vip, novo" });
+    expect(after).toEqual({ name: "Ana" });
+    expect(after).not.toHaveProperty("tags");
+    expect(computeChangedFields(before, after)).toEqual(["tags"]);
+  });
+
   it("vazio na criação, na exclusão, no login e quando nada muda", () => {
     expect(computeChangedFields(null, { name: "Ana" })).toEqual([]);
     expect(computeChangedFields({ name: "Ana" }, null)).toEqual([]);

@@ -44,6 +44,9 @@ describe("POST /api/client/users", () => {
         phone: "48999999999",
         isActive: true,
         idleTimeoutMinutes: null,
+        // Nasce sem cargo e sem acesso.
+        lastLoginAt: null,
+        roles: [],
       }),
     });
 

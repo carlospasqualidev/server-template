@@ -2,19 +2,32 @@ import { type Prisma } from "@/generated/prisma/client";
 import { toSkipTake } from "@/lib/http/pagination";
 import { notDeleted, prisma } from "@/lib/prisma";
 import { type ListUsersQuery } from "@/modules/users/schemas/listUsers.schema";
-import { userSelect } from "@/modules/users/users.select";
+import { currentRolesWhere, toUserWithRoles, userCrudSelect } from "@/modules/users/users.select";
 
 interface ListUsersInput {
   companyId: string;
   query: ListUsersQuery;
 }
 
-/** Listagem paginada de referência: escopo por tenant, exclusão lógica, busca, filtro e ordenação por allowlist. */
+/**
+ * Ordenação da lista. Em `lastLoginAt`, quem nunca acessou (null) fica no fim nos dois sentidos. O id (uuid v7) desempata:
+ * a paginação fica estável entre usuários com o mesmo valor (vários que nunca acessaram, nomes iguais).
+ */
+function toUsersOrderBy({ orderBy, order }: ListUsersQuery): Prisma.UserOrderByWithRelationInput[] {
+  const primary: Prisma.UserOrderByWithRelationInput =
+    orderBy === "lastLoginAt" ? { lastLoginAt: { sort: order, nulls: "last" } } : { [orderBy]: order };
+
+  return [primary, { id: order }];
+}
+
+/** Listagem paginada de referência: escopo por tenant, exclusão lógica, busca, filtros e ordenação por allowlist. */
 export async function listUsersService({ companyId, query }: ListUsersInput) {
   const where: Prisma.UserWhereInput = {
     companyId,
     ...notDeleted,
     ...(query.isActive !== undefined && { isActive: query.isActive }),
+    // Só cargo que vale conta: id de cargo de outra empresa (ou excluído) no filtro não encontra ninguém.
+    ...(query.roleId && { userRoles: { some: { roleId: { in: query.roleId }, ...currentRolesWhere(companyId) } } }),
     ...(query.search && {
       OR: [
         { name: { contains: query.search, mode: "insensitive" } },
@@ -26,12 +39,12 @@ export async function listUsersService({ companyId, query }: ListUsersInput) {
   const [users, count] = await prisma.$transaction([
     prisma.user.findMany({
       where,
-      select: userSelect,
-      orderBy: { [query.orderBy]: query.order },
+      select: userCrudSelect(companyId),
+      orderBy: toUsersOrderBy(query),
       ...toSkipTake(query),
     }),
     prisma.user.count({ where }),
   ]);
 
-  return { users, count };
+  return { users: users.map(toUserWithRoles), count };
 }

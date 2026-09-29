@@ -83,33 +83,33 @@ Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
 Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm permissão respondem 403 sem ela.
 
-| Método   | Rota                      | Protegida | Permissão                                             | Descrição                                                                     |
-| -------- | ------------------------- | --------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/session/login`          | não       |                                                       | Autentica e grava o cookie                                                    |
-| `POST`   | `/session/register`       | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
-| `POST`   | `/session/logout`         | não       |                                                       | Limpa o cookie                                                                |
-| `GET`    | `/users/me`               | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                   |
-| `GET`    | `/users`                  | sim       | `backoffice.users.read`                               | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
-| `GET`    | `/users/:userId`          | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa)                                                  |
-| `POST`   | `/users`                  | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                       |
-| `PATCH`  | `/users/:userId`          | sim       | `backoffice.users.update`                             | Atualização parcial                                                           |
-| `DELETE` | `/users/:userId`          | sim       | `backoffice.users.delete`                             | Exclusão lógica                                                               |
-| `PUT`    | `/users/:userId/roles`    | sim       | `backoffice.users.update`                             | Define os cargos do usuário                                                   |
-| `GET`    | `/roles/permissions`      | sim       | `backoffice.roles.read`                               | Catálogo de permissões agrupado (módulo → grupo → permissões)                 |
-| `GET`    | `/roles`                  | sim       | `backoffice.roles.read`                               | Lista paginada de cargos (`page`, `pageSize`, `orderBy`, `order`, `search`)   |
-| `GET`    | `/roles/:roleId`          | sim       | `backoffice.roles.read`                               | Cargo com as permissões                                                       |
-| `POST`   | `/roles`                  | sim       | `backoffice.roles.create`                             | Cria cargo                                                                    |
-| `POST`   | `/roles/:roleId/copy`     | sim       | `backoffice.roles.create`                             | Copia cargo (permissões e descrição, sem usuários)                            |
-| `PUT`    | `/roles/:roleId`          | sim       | `backoffice.roles.update`                             | Edita nome, descrição e o conjunto de permissões                              |
-| `DELETE` | `/roles/:roleId`          | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                          |
-| `GET`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                   |
-| `PUT`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                   |
-| `GET`    | `/system-configs`         | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)          |
-| `PATCH`  | `/system-configs`         | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada     |
-| `GET`    | `/audit-logs`             | sim       | `backoffice.audit.read`                               | Trilha de auditoria paginada (filtros, período, busca, ordenação)             |
-| `GET`    | `/audit-logs/options`     | sim       | `backoffice.audit.read`                               | Módulos, ações e entidades da trilha, com rótulo pt-BR                        |
-| `GET`    | `/audit-logs/:auditLogId` | sim       | `backoffice.audit.read`                               | Registro da trilha com antes, depois e autor                                  |
-| `POST`   | `/upload/file`            | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                     |
+| Método   | Rota                      | Protegida | Permissão                                             | Descrição                                                                                                          |
+| -------- | ------------------------- | --------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `POST`   | `/session/login`          | não       |                                                       | Autentica e grava o cookie                                                                                         |
+| `POST`   | `/session/register`       | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                                                     |
+| `POST`   | `/session/logout`         | não       |                                                       | Limpa o cookie                                                                                                     |
+| `GET`    | `/users/me`               | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                                                        |
+| `GET`    | `/users`                  | sim       | `backoffice.users.read`                               | Lista paginada com cargos e último acesso (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`, `roleId`) |
+| `GET`    | `/users/:userId`          | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa), com cargos e último acesso                                                           |
+| `POST`   | `/users`                  | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                                                            |
+| `PATCH`  | `/users/:userId`          | sim       | `backoffice.users.update`                             | Atualização parcial                                                                                                |
+| `DELETE` | `/users/:userId`          | sim       | `backoffice.users.delete`                             | Exclusão lógica                                                                                                    |
+| `PUT`    | `/users/:userId/roles`    | sim       | `backoffice.users.update`                             | Define os cargos do usuário                                                                                        |
+| `GET`    | `/roles/permissions`      | sim       | `backoffice.roles.read`                               | Catálogo de permissões agrupado (módulo → grupo → permissões)                                                      |
+| `GET`    | `/roles`                  | sim       | `backoffice.roles.read`                               | Lista paginada de cargos (`page`, `pageSize`, `orderBy`, `order`, `search`)                                        |
+| `GET`    | `/roles/:roleId`          | sim       | `backoffice.roles.read`                               | Cargo com as permissões                                                                                            |
+| `POST`   | `/roles`                  | sim       | `backoffice.roles.create`                             | Cria cargo                                                                                                         |
+| `POST`   | `/roles/:roleId/copy`     | sim       | `backoffice.roles.create`                             | Copia cargo (permissões e descrição, sem usuários)                                                                 |
+| `PUT`    | `/roles/:roleId`          | sim       | `backoffice.roles.update`                             | Edita nome, descrição e o conjunto de permissões                                                                   |
+| `DELETE` | `/roles/:roleId`          | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                                                               |
+| `GET`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                                                        |
+| `PUT`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                                                        |
+| `GET`    | `/system-configs`         | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)                                               |
+| `PATCH`  | `/system-configs`         | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada                                          |
+| `GET`    | `/audit-logs`             | sim       | `backoffice.audit.read`                               | Trilha de auditoria paginada (filtros, período, busca, ordenação)                                                  |
+| `GET`    | `/audit-logs/options`     | sim       | `backoffice.audit.read`                               | Módulos, ações e entidades da trilha, com rótulo pt-BR                                                             |
+| `GET`    | `/audit-logs/:auditLogId` | sim       | `backoffice.audit.read`                               | Registro da trilha com antes, depois e autor                                                                       |
+| `POST`   | `/upload/file`            | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                                                          |
 
 Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `issues: [{ path, message }]`. O contrato completo, gerado dos schemas, fica em [`docs/openapi.json`](docs/openapi.json).
 
@@ -122,6 +122,10 @@ Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do ca
 ## Sessão e timeout de inatividade
 
 Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie vale até `SESSION_TTL_HOURS`).
+
+## Usuários
+
+O usuário do CRUD (`/users`) traz, além do cadastro, os cargos que valem (`roles: [{ id, name }]`, por nome) e o último acesso (`lastLoginAt`, `null` para quem nunca acessou), gravado a cada abertura de sessão (login bem-sucedido ou register) junto do registro de auditoria, sem mexer no `updatedAt`, que reflete só edição de cadastro. Não há campo de status: ativo ou bloqueado é `isActive`. A lista filtra por cargo (`roleId=<id>,<id>`, qualquer um deles) e ordena por último acesso com quem nunca acessou no fim. Contrato completo: [`CLAUDE.md`](CLAUDE.md#contrato-com-os-clientes-frontend-web-e-app).
 
 ## Configurações de sistema
 

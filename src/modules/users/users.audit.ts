@@ -1,4 +1,13 @@
 import { toAuditListText } from "@/lib/audit/auditSnapshot";
+import { type UserCrudRow } from "@/modules/users/users.select";
+
+/**
+ * Estado do usuário na trilha de auditoria (criação, edição), o mesmo da exclusão (`userSelect`): a linha cadastral,
+ * sem o último acesso (carimbo do login, não mudança feita por alguém) nem os cargos (têm registro próprio, abaixo).
+ */
+export function toUserAuditState({ lastLoginAt: _lastLoginAt, userRoles: _userRoles, ...user }: UserCrudRow) {
+  return user;
+}
 
 /**
  * Estado "cargos do usuário" na trilha de auditoria, o mesmo pelos dois caminhos que o mudam (`PUT /users/:userId/roles`

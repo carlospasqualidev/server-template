@@ -5,7 +5,8 @@ import { assertExists } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { PERMISSION_CATALOG, PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
-import { createUser, findAdminRole } from "@/tests/helpers/factories";
+import { withFrozenDate } from "@/tests/helpers/clock";
+import { createUser, findAdminRole, findAuditLogs } from "@/tests/helpers/factories";
 import { raceAgainstCatalogSync } from "@/tests/helpers/permissionCatalogLock";
 
 const REGISTER_URL = "/api/client/session/register";
@@ -45,6 +46,28 @@ describe("POST /api/client/session/register", () => {
     const created = await prisma.user.findUnique({ where: { email: "carla@example.com" }, include: { company: true } });
     expect(created?.company.name).toBe("Empresa de Carla");
     expect(created?.password).not.toBe("senha-forte-1");
+  });
+
+  it("grava o primeiro acesso em UTC, fora do registro de auditoria da criação", async () => {
+    // Relógio da aplicação parado longe de agora: o valor gravado é o `Date` do processo, não o `now()` do banco.
+    const registeredAt = new Date("2030-02-20T08:09:10.123Z");
+
+    const response = await withFrozenDate(registeredAt, () =>
+      app.inject({
+        method: "POST",
+        url: REGISTER_URL,
+        payload: { name: "Lia", email: "lia@example.com", password: "senha-forte-1" },
+      }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().user).not.toHaveProperty("lastLoginAt");
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: "lia@example.com" } });
+    expect(user.lastLoginAt).toEqual(registeredAt);
+    const [audit] = await findAuditLogs(user.companyId);
+    expect(audit).toMatchObject({ action: "create", entityId: user.id });
+    expect(audit?.after).not.toHaveProperty("lastLoginAt");
   });
 
   it("cria o cargo de sistema Administrador da empresa, com o catálogo inteiro, e vincula o usuário", async () => {

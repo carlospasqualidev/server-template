@@ -667,7 +667,7 @@
         "tags": [
           "Users"
         ],
-        "description": "Paginação 0-based, ordenação por allowlist e filtros. Só usuários da empresa do usuário autenticado. Exige `backoffice.users.read`.",
+        "description": "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos) e filtros. Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
         "parameters": [
           {
             "schema": {
@@ -700,13 +700,14 @@
               "enum": [
                 "name",
                 "email",
-                "createdAt"
+                "createdAt",
+                "lastLoginAt"
               ]
             },
             "in": "query",
             "name": "orderBy",
             "required": false,
-            "description": "Campo de ordenação: name, email, createdAt."
+            "description": "Campo de ordenação: name, email, createdAt, lastLoginAt."
           },
           {
             "schema": {
@@ -744,6 +745,15 @@
             "name": "isActive",
             "required": false,
             "description": "Filtra por status: true (ativos) ou false (bloqueados)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "roleId",
+            "required": false,
+            "description": "Cargos (ids), separados por vírgula: usuários com qualquer um deles."
           }
         ],
         "security": [
@@ -792,7 +802,7 @@
                           },
                           "isActive": {
                             "type": "boolean",
-                            "description": "Usuário bloqueado quando false."
+                            "description": "Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."
                           },
                           "idleTimeoutMinutes": {
                             "anyOf": [
@@ -806,6 +816,40 @@
                               }
                             ],
                             "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                          },
+                          "lastLoginAt": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou."
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "Identificador do cargo."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Nome do cargo."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Cargos do usuário (não excluídos, da empresa dele), em ordem alfabética do nome. `[]` sem cargo."
                           },
                           "createdAt": {
                             "type": "string",
@@ -824,6 +868,8 @@
                           "phone",
                           "isActive",
                           "idleTimeoutMinutes",
+                          "lastLoginAt",
+                          "roles",
                           "createdAt",
                           "updatedAt"
                         ],
@@ -1107,7 +1153,7 @@
                         },
                         "isActive": {
                           "type": "boolean",
-                          "description": "Usuário bloqueado quando false."
+                          "description": "Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."
                         },
                         "idleTimeoutMinutes": {
                           "anyOf": [
@@ -1121,6 +1167,40 @@
                             }
                           ],
                           "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
+                        "lastLoginAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou."
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Identificador do cargo."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome do cargo."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Cargos do usuário (não excluídos, da empresa dele), em ordem alfabética do nome. `[]` sem cargo."
                         },
                         "createdAt": {
                           "type": "string",
@@ -1139,6 +1219,8 @@
                         "phone",
                         "isActive",
                         "idleTimeoutMinutes",
+                        "lastLoginAt",
+                        "roles",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -1519,7 +1601,7 @@
                         },
                         "isActive": {
                           "type": "boolean",
-                          "description": "Usuário bloqueado quando false."
+                          "description": "Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."
                         },
                         "idleTimeoutMinutes": {
                           "anyOf": [
@@ -1533,6 +1615,40 @@
                             }
                           ],
                           "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
+                        "lastLoginAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou."
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Identificador do cargo."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome do cargo."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Cargos do usuário (não excluídos, da empresa dele), em ordem alfabética do nome. `[]` sem cargo."
                         },
                         "createdAt": {
                           "type": "string",
@@ -1551,6 +1667,8 @@
                         "phone",
                         "isActive",
                         "idleTimeoutMinutes",
+                        "lastLoginAt",
+                        "roles",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -1874,7 +1992,7 @@
                         },
                         "isActive": {
                           "type": "boolean",
-                          "description": "Usuário bloqueado quando false."
+                          "description": "Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."
                         },
                         "idleTimeoutMinutes": {
                           "anyOf": [
@@ -1888,6 +2006,40 @@
                             }
                           ],
                           "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        },
+                        "lastLoginAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou."
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "Identificador do cargo."
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Nome do cargo."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Cargos do usuário (não excluídos, da empresa dele), em ordem alfabética do nome. `[]` sem cargo."
                         },
                         "createdAt": {
                           "type": "string",
@@ -1906,6 +2058,8 @@
                         "phone",
                         "isActive",
                         "idleTimeoutMinutes",
+                        "lastLoginAt",
+                        "roles",
                         "createdAt",
                         "updatedAt"
                       ],
@@ -2407,7 +2561,7 @@
                         },
                         "isActive": {
                           "type": "boolean",
-                          "description": "Usuário bloqueado quando false."
+                          "description": "Status do acesso: true ativo, false bloqueado. Não há outro campo de status: o cliente deriva daqui."
                         },
                         "idleTimeoutMinutes": {
                           "anyOf": [
@@ -2422,13 +2576,17 @@
                           ],
                           "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
                         },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "updatedAt": {
-                          "type": "string",
-                          "format": "date-time"
+                        "lastLoginAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Última abertura de sessão (login bem-sucedido ou register), ISO 8601 UTC; null quando o usuário nunca acessou."
                         },
                         "roles": {
                           "type": "array",
@@ -2456,6 +2614,14 @@
                             "additionalProperties": false
                           },
                           "description": "Cargos do usuário, em ordem alfabética."
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
                         }
                       },
                       "required": [
@@ -2466,9 +2632,10 @@
                         "phone",
                         "isActive",
                         "idleTimeoutMinutes",
+                        "lastLoginAt",
+                        "roles",
                         "createdAt",
-                        "updatedAt",
-                        "roles"
+                        "updatedAt"
                       ],
                       "additionalProperties": false
                     }

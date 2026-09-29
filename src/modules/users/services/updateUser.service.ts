@@ -7,7 +7,8 @@ import { isLastActiveAdminService } from "@/modules/permissions/services/isLastA
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
 import { type UpdateUserBody } from "@/modules/users/schemas/updateUser.schema";
 import { findUserByIdService } from "@/modules/users/services/findUserById.service";
-import { userSelect } from "@/modules/users/users.select";
+import { toUserAuditState } from "@/modules/users/users.audit";
+import { toUserWithRoles, userCrudSelect, userSelect } from "@/modules/users/users.select";
 
 interface UpdateUserInput {
   companyId: string;
@@ -90,13 +91,18 @@ export async function updateUserService({ companyId, userId, data }: UpdateUserI
 
     assertExists(before, "Usuário");
 
-    const user = await tx.user.update({ where: { id: userId }, data: updateData, select: userSelect });
+    const user = await tx.user.update({ where: { id: userId }, data: updateData, select: userCrudSelect(companyId) });
 
     await recordAuditService(
-      toUserChangeAuditEntries({ companyId, before, after: user, passwordChanged: data.password !== undefined }),
+      toUserChangeAuditEntries({
+        companyId,
+        before,
+        after: toUserAuditState(user),
+        passwordChanged: data.password !== undefined,
+      }),
       tx,
     );
 
-    return user;
+    return toUserWithRoles(user);
   });
 }

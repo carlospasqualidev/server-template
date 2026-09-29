@@ -3,6 +3,7 @@ import { ForbiddenError, UnauthorizedError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { findEffectivePermissionsService } from "@/modules/permissions/services/findEffectivePermissions.service";
+import { recordLastLoginService } from "@/modules/session/services/recordLastLogin.service";
 import { resolveIdleTimeoutMinutesService } from "@/modules/systemConfigs/services/resolveIdleTimeoutMinutes.service";
 
 let fallbackHash: Promise<string> | undefined;
@@ -39,9 +40,11 @@ export async function authenticateUserService({ email, password }: { email: stri
     throw new ForbiddenError("Sua conta está bloqueada.");
   }
 
-  // Login bem-sucedido entra na trilha, com o próprio usuário como autor (a rota é pública, não há sessão ainda). Numa
-  // transação para o que mais o login gravar (ex.: último acesso) confirmar junto com o registro.
+  // Login bem-sucedido grava o último acesso e entra na trilha, com o próprio usuário como autor (a rota é pública, não
+  // há sessão ainda), numa transação só: os dois confirmam ou desfazem juntos. O último acesso não vai ao `before`/`after`
+  // do registro (não é mudança feita por alguém) nem mexe no `updatedAt` (`recordLastLoginService`).
   await prisma.$transaction(async (tx) => {
+    await recordLastLoginService({ companyId: user.companyId, userId: user.id }, tx);
     await recordAuditService(
       {
         companyId: user.companyId,

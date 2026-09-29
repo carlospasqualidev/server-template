@@ -3,7 +3,8 @@ import { ConflictError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { type CreateUserBody } from "@/modules/users/schemas/createUser.schema";
-import { userSelect } from "@/modules/users/users.select";
+import { toUserAuditState } from "@/modules/users/users.audit";
+import { toUserWithRoles, userCrudSelect } from "@/modules/users/users.select";
 
 interface CreateUserInput {
   companyId: string;
@@ -30,7 +31,7 @@ export async function createUserService({ companyId, data }: CreateUserInput) {
         image: data.image ?? null,
         idleTimeoutMinutes: data.idleTimeoutMinutes ?? null,
       },
-      select: userSelect,
+      select: userCrudSelect(companyId),
     });
 
     await recordAuditService(
@@ -41,11 +42,11 @@ export async function createUserService({ companyId, data }: CreateUserInput) {
         entityId: user.id,
         action: "create",
         description: "Cadastrou um usuário",
-        after: user,
+        after: toUserAuditState(user),
       },
       tx,
     );
 
-    return user;
+    return toUserWithRoles(user);
   });
 }

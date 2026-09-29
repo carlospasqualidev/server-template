@@ -158,6 +158,37 @@ describe("trilha de auditoria: usuários", () => {
       ]);
     });
 
+    it("último acesso e cargos ficam fora do antes e do depois", async () => {
+      const admin = await createUser();
+      const role = await createRole({ companyId: admin.companyId, name: "Suporte" });
+      const target = await createUser({
+        companyId: admin.companyId,
+        roleIds: [role.id],
+        lastLoginAt: new Date("2026-09-20T10:00:00.000Z"),
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { idleTimeoutMinutes: 45 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user).toMatchObject({
+        lastLoginAt: "2026-09-20T10:00:00.000Z",
+        roles: [{ id: role.id, name: "Suporte" }],
+      });
+      expect(await findAuditLogs(admin.companyId)).toEqual([
+        expect.objectContaining({
+          action: "update",
+          before: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: null },
+          after: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: 45 },
+          changedFields: ["idleTimeoutMinutes"],
+        }),
+      ]);
+    });
+
     it("troca de senha aparece só como campo alterado, sem valor", async () => {
       const admin = await createUser();
       const target = await createUser({ companyId: admin.companyId });

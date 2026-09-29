@@ -1,6 +1,6 @@
 import { assertExists } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
-import { userSelect } from "@/modules/users/users.select";
+import { toUserWithRoles, userCrudSelect } from "@/modules/users/users.select";
 
 interface FindUserByIdInput {
   companyId: string;
@@ -11,10 +11,10 @@ interface FindUserByIdInput {
 export async function findUserByIdService({ companyId, userId }: FindUserByIdInput) {
   const user = await prisma.user.findFirst({
     where: { id: userId, companyId, ...notDeleted },
-    select: userSelect,
+    select: userCrudSelect(companyId),
   });
 
   assertExists(user, "Usuário");
 
-  return user;
+  return toUserWithRoles(user);
 }

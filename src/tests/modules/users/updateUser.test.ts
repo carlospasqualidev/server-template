@@ -35,7 +35,14 @@ describe("PATCH /api/client/users/:userId", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       message: "Usuário atualizado.",
-      user: expect.objectContaining({ id: target.id, name: "Depois", phone: "48999999999", isActive: false }),
+      user: expect.objectContaining({
+        id: target.id,
+        name: "Depois",
+        phone: "48999999999",
+        isActive: false,
+        lastLoginAt: null,
+        roles: [{ id: (await findAdminRole(admin.companyId)).id, name: "Administrador" }],
+      }),
     });
   });
 

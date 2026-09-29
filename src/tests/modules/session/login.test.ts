@@ -4,7 +4,8 @@ import { type App } from "@/app";
 import { prisma } from "@/lib/prisma";
 import { PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
-import { createRole, createUser, DEFAULT_PASSWORD } from "@/tests/helpers/factories";
+import { withFrozenDate } from "@/tests/helpers/clock";
+import { createRole, createUser, DEFAULT_PASSWORD, findAuditLogs } from "@/tests/helpers/factories";
 
 const LOGIN_URL = "/api/client/session/login";
 
@@ -45,6 +46,59 @@ describe("POST /api/client/session/login", () => {
     const cookie = response.cookies.find((item) => item.name === "token");
     expect(cookie).toMatchObject({ httpOnly: true, path: "/", sameSite: "Lax" });
     expect(cookie?.value).toBeTruthy();
+  });
+
+  it("grava o último acesso em UTC junto do registro de auditoria do login, sem mexer no updatedAt", async () => {
+    const user = await createUser({ email: "acesso@example.com", lastLoginAt: new Date("2026-09-01T12:00:00.000Z") });
+    // Relógio da aplicação parado longe de agora: o valor gravado tem de ser o `Date` do processo, em UTC. O `now()` do
+    // banco daria a hora real, e no fuso da sessão.
+    const loginAt = new Date("2030-01-15T10:20:30.456Z");
+
+    const response = await withFrozenDate(loginAt, () =>
+      app.inject({
+        method: "POST",
+        url: LOGIN_URL,
+        payload: { email: "acesso@example.com", password: DEFAULT_PASSWORD },
+      }),
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user).not.toHaveProperty("lastLoginAt");
+
+    const stored = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(stored.lastLoginAt).toEqual(loginAt);
+    expect(stored.updatedAt).toEqual(user.updatedAt);
+    // A coluna é `TIMESTAMP(3)` sem fuso: o texto gravado é a hora UTC, sem deslocamento.
+    const [raw] = await prisma.$queryRaw<{ lastLoginAt: string }[]>`
+      SELECT "lastLoginAt"::text AS "lastLoginAt" FROM users WHERE id = ${user.id}
+    `;
+    expect(raw?.lastLoginAt).toBe("2030-01-15 10:20:30.456");
+    expect(await findAuditLogs(user.companyId)).toEqual([
+      expect.objectContaining({ entityId: user.id, action: "login", before: null, after: null, changedFields: [] }),
+    ]);
+  });
+
+  it("login que falha não grava o último acesso", async () => {
+    const user = await createUser({ email: "falha@example.com" });
+    const blocked = await createUser({ companyId: user.companyId, email: "bloq@example.com", isActive: false });
+
+    const wrongPassword = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      payload: { email: "falha@example.com", password: "senha-errada" },
+    });
+    const blockedAccount = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      payload: { email: "bloq@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(wrongPassword.statusCode).toBe(401);
+    expect(blockedAccount.statusCode).toBe(403);
+
+    const users = await prisma.user.findMany({ where: { id: { in: [user.id, blocked.id] } } });
+    expect(users.map((row) => row.lastLoginAt)).toEqual([null, null]);
+    expect(await findAuditLogs(user.companyId)).toEqual([]);
   });
 
   it("devolve só as permissões dos cargos do usuário, achatadas e ordenadas", async () => {
