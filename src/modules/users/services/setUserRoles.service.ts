@@ -1,10 +1,12 @@
 import { assertExists, BadRequestError, NotFoundError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { ADMIN_ROLE } from "@/modules/permissions/permission.catalog";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
 import { isLastActiveAdminService } from "@/modules/permissions/services/isLastActiveAdmin.service";
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
 import { OWN_ROLES_CHANGE_MESSAGE } from "@/modules/roles/services/setRoleUsers.service";
+import { toUserRolesAuditSnapshot } from "@/modules/users/users.audit";
 import { toUserWithRoles, userWithRolesSelect } from "@/modules/users/users.select";
 
 interface SetUserRolesInput {
@@ -83,6 +85,20 @@ export async function setUserRolesService({ companyId, actorId, userId, roleIds 
       data: uniqueRoleIds.map((roleId) => ({ userId, roleId })),
       skipDuplicates: true,
     });
+
+    await recordAuditService(
+      {
+        companyId,
+        module: "SECURITY",
+        entity: "User",
+        entityId: userId,
+        action: "update",
+        description: "Alterou os cargos de um usuário",
+        before: toUserRolesAuditSnapshot(target.userRoles.map((userRole) => userRole.role.name)),
+        after: toUserRolesAuditSnapshot(roles.map((role) => role.name)),
+      },
+      tx,
+    );
 
     const updated = await tx.user.findFirst({
       where: { id: userId, companyId, ...notDeleted },

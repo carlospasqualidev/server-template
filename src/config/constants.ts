@@ -25,5 +25,8 @@ export const IDLE_TIMEOUT_MINUTES_RANGE = { min: 1, max: 480 } as const;
 /** Tamanho máximo do texto de um valor de configuração de sistema (qualquer tipo). */
 export const MAX_SYSTEM_CONFIG_VALUE_LENGTH = 10_000;
 
+/** Tamanho máximo do `User-Agent` gravado na trilha de auditoria: o cabeçalho vem do cliente e não tem limite próprio. */
+export const AUDIT_USER_AGENT_MAX_LENGTH = 512;
+
 /** Limite de tentativas de login por IP. */
 export const LOGIN_RATE_LIMIT = { max: 10, timeWindow: "1 minute" } as const;

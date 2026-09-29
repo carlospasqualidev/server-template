@@ -1,6 +1,7 @@
 import { hashPassword } from "@/lib/auth/password";
 import { ConflictError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { type CreateUserBody } from "@/modules/users/schemas/createUser.schema";
 import { userSelect } from "@/modules/users/users.select";
 
@@ -16,16 +17,35 @@ export async function createUserService({ companyId, data }: CreateUserInput) {
     throw new ConflictError("E-mail já cadastrado.");
   }
 
-  return prisma.user.create({
-    data: {
-      companyId,
-      name: data.name,
-      email: data.email,
-      password: await hashPassword(data.password),
-      phone: data.phone ?? null,
-      image: data.image ?? null,
-      idleTimeoutMinutes: data.idleTimeoutMinutes ?? null,
-    },
-    select: userSelect,
+  const passwordHash = await hashPassword(data.password);
+
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        companyId,
+        name: data.name,
+        email: data.email,
+        password: passwordHash,
+        phone: data.phone ?? null,
+        image: data.image ?? null,
+        idleTimeoutMinutes: data.idleTimeoutMinutes ?? null,
+      },
+      select: userSelect,
+    });
+
+    await recordAuditService(
+      {
+        companyId,
+        module: "USERS",
+        entity: "User",
+        entityId: user.id,
+        action: "create",
+        description: "Cadastrou um usuário",
+        after: user,
+      },
+      tx,
+    );
+
+    return user;
   });
 }

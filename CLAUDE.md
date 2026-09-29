@@ -8,7 +8,7 @@ Guia para o Claude trabalhar neste backend. Este arquivo é a fonte de verdade p
 
 ## Stack
 
-Node 22+ (ESM) • Fastify 5 • TypeScript strict • Zod 4 + `fastify-type-provider-zod` (um schema gera validação, tipo, serialização e OpenAPI) • Prisma 7 (PostgreSQL via driver adapter `pg`) • JWT em cookie HTTP-only • Swagger UI • bcrypt • AWS S3 (upload em stream) • pino • Vitest (integração com Postgres descartável) • ESLint + Prettier + Husky + lint-staged • Docker Compose (Postgres).
+Node 22+ (ESM) • Fastify 5 • TypeScript strict • Zod 4 + `fastify-type-provider-zod` (um schema gera validação, tipo, serialização e OpenAPI) • Prisma 7 (PostgreSQL via driver adapter `pg`) • JWT em cookie HTTP-only • `@fastify/request-context` (contexto por requisição, só para a trilha de auditoria) • Swagger UI • bcrypt • AWS S3 (upload em stream) • pino • Vitest (integração com Postgres descartável) • ESLint + Prettier + Husky + lint-staged • Docker Compose (Postgres).
 
 ---
 
@@ -146,12 +146,13 @@ Regras práticas:
 - Mensagem de erro não ecoa o input: `"E-mail já cadastrado."`, nunca `"O e-mail x@y.com já existe."`.
 - Query string nunca leva PII (`?email=` vira log de servidor). Use body em POST.
 - Seeds e factories usam dados fictícios (`@example.com`).
+- **Trilha de auditoria** (ver **Trilha de auditoria**): `description` nunca leva nome, e-mail ou outro dado pessoal; `before`/`after` nunca levam segredo (sai em `pickAuditable`) e trocam por `[omitido]` o valor dos campos pessoais da entidade (`AUDIT_PERSONAL_FIELDS`) e das configurações com `redactInAudit`; o nome do autor vem do relacionamento com `User`, nunca de cópia. `ip` e `userAgent` são gravados (segurança) e não saem pela API. Política de retenção e anonimização da trilha ainda não existe.
 
 ---
 
 ## Performance
 
-- **Listagem sempre paginada** (`paginationQuerySchema`, máx. `MAX_PAGE_SIZE`). Sem `findMany` sem `take`. Exceções: (1) catálogo finito vindo do código: o de permissões (`GET /roles/permissions`) e o de configurações de sistema (`GET /system-configs`, que lê só as chaves do catálogo, no máximo uma linha por chave pelo índice único); (2) consulta limitada pelo tamanho **validado** do corpo: lista de ids com `.max(MAX_BODY_IDS, "<mensagem pt-BR>")` no schema da rota, usada como `id: { in: [...] }` (ou `userId: { in: [...] }`). Lista sem `max` não é limite. Para o que fica fora da lista (ex.: quem sai do cargo), escreva com `notIn` em vez de ler o conjunto inteiro.
+- **Listagem sempre paginada** (`paginationQuerySchema`, máx. `MAX_PAGE_SIZE`). Sem `findMany` sem `take`. Exceções: (1) catálogo finito vindo do código: o de permissões (`GET /roles/permissions`) e o de configurações de sistema (`GET /system-configs`, que lê só as chaves do catálogo, no máximo uma linha por chave pelo índice único); (2) consulta limitada pelo tamanho **validado** do corpo: lista de ids com `.max(MAX_BODY_IDS, "<mensagem pt-BR>")` no schema da rota, usada como `id: { in: [...] }` (ou `userId: { in: [...] }`). Lista sem `max` não é limite; (3) consulta limitada pelo que a própria escrita mudou: os ids que um `DELETE ... RETURNING` devolveu. Para o que fica fora da lista do corpo (ex.: quem sai do cargo), nunca leia o conjunto inteiro: apague com `notIn` ou, quando precisar saber quem saiu (trilha de auditoria), com `DELETE ... RETURNING` em SQL tagueado, que apaga e devolve os ids no mesmo comando (referência: `setRoleUsersService`). O custo acompanha a mudança, não o tamanho do conjunto.
 - `select` explícito em toda consulta (ver `users.select.ts`). Nunca `include` cego nem devolver a linha inteira.
 - `prisma.$transaction([findMany, count])` para lista + total numa ida só.
 - **Índices**: toda FK e todo `deletedAt` têm `@@index` no schema. Campo novo usado em `where`/`orderBy` frequente ganha índice na mesma migration.
@@ -177,9 +178,10 @@ src/tests/
 ├── helpers/
 │   ├── app.ts                     # createTestApp(options) → app pronto para inject()
 │   ├── session.ts                 # sessionCookiesFor(userId) → cookie válido sem passar pelo login
-│   ├── factories.ts               # createCompany(), createRole({...}), findAdminRole(companyId), createUser({...}), findPermissionIds([...]), findRolePermissionNames(roleId), createSystemConfig({ companyId, key, value })
+│   ├── factories.ts               # createCompany(), createRole({...}), findAdminRole(companyId), createUser({...}), findPermissionIds([...]), findRolePermissionNames(roleId), createSystemConfig({ companyId, key, value }), createAuditLog({...}), findAuditLogs(companyId)
 │   ├── companyAdminsLock.ts       # raceAgainstAdminChange({...}) → corrida contra a trava da empresa (último administrador, vínculo x exclusão de cargo), determinística
 │   ├── permissionCatalogLock.ts   # raceAgainstCatalogSync({...}) → operação concorrente a uma sincronização do catálogo, determinística
+│   ├── systemConfigsLock.ts       # raceAgainstSystemConfigsBatch({...}) → lote de configurações concorrente a outro da mesma empresa, determinístico
 │   └── multipart.ts               # buildMultipartBody([...]) para upload
 ├── modules/<módulo>/<endpoint>.test.ts
 ├── hooks/<hook>.test.ts
@@ -189,6 +191,7 @@ src/tests/
 - **Permissões nos testes**: `createCompany()` cria a empresa com o cargo `Administrador` (como o register). `createUser()` sem `permissions` recebe esse cargo, com o catálogo inteiro; `permissions: []` cria o usuário sem cargo; `permissions: ["backoffice.users.read"]` cria um cargo só com essas; `roleIds` vincula cargos já criados (`createRole`). Teste de 403 usa um usuário com todas as permissões menos a exigida.
 
 - **Todo endpoint novo tem teste** cobrindo: happy path (status + shape da resposta), validação (400 com `issues`), sem sessão (401), sem a permissão exigida (403), registro de outra empresa (404) e cada regra de negócio (409, 403, mensagem). Filtro e ordenação exigem **dado**: semeie registros que entram e que ficam de fora e asserte os dois lados.
+- **Toda mutação nova tem teste do registro de auditoria** (`findAuditLogs(companyId)`): o registro gravado (módulo, entidade, ação, `before`/`after`, `changedFields`, autor), nenhum segredo nem dado pessoal no JSON e nenhum registro quando a mutação falha. Os testes da trilha ficam em `src/tests/modules/audit/`.
 - Teste o caminho de falha, não só o feliz. Asserte a mensagem pt-BR: ela é contrato com o frontend.
 - S3 é mockado com `aws-sdk-client-mock` (`mockClient(S3Client)`); nenhum teste faz rede.
 - Factories em `helpers/factories.ts`; não escreva `prisma.user.create` gigante inline.
@@ -228,9 +231,10 @@ src/
 ├── lib/                    # infraestrutura compartilhada; NÃO importa de modules/
 │   ├── prisma.ts           # client único + `notDeleted`
 │   ├── errors/             # AppError e filhos, assertExists, errorHandler, reportError
-│   ├── http/               # pagination, query (search/boolean/csv), responses (erro, message, data)
+│   ├── http/               # pagination, query (search/boolean/csv/intervalo de datas), responses (erro, message, data)
 │   ├── validation/         # primitivos Zod pt-BR (email, senha, cpf, cnpj, cep, telefone, datas)
 │   ├── auth/               # password (bcrypt), session (JWT + cookie), authenticatedUser
+│   ├── audit/              # contexto da requisição para a trilha (auditContext) e cura do antes/depois (auditSnapshot)
 │   ├── storage/s3.ts       # client S3 preguiçoso, URL pública, 503 quando não configurado
 │   └── format/             # máscaras e unmask pt-BR
 ├── modules/<módulo>/       # um módulo por recurso de negócio
@@ -247,7 +251,7 @@ scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
 docs/openapi.json           # contrato gerado; commitado
 ```
 
-Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
+Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência), `upload` (arquivo → S3), `audit` (trilha de auditoria: gravação pelas mutações, lista, detalhe e opções de filtro), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
 
 ---
 
@@ -271,7 +275,7 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 | `hooks`       | services, `@/lib/*`, `permission.catalog` (tipos) | `@/lib/prisma`                         |
 | `lib`, `config` | `@/lib/*`, `@/config/*`, `@/generated`        | `@/modules/*`                            |
 
-Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro. O módulo `permissions` expõe também `permission.catalog.ts` (catálogo, `PermissionName`, `PermissionModule`, `ADMIN_ROLE`) e `permissions.select.ts` (`effectivePermissionsSelect({ userId } | { companyId })` + `toPermissionNames`, para ler usuário e permissões na mesma consulta). O módulo `systemConfigs` expõe `systemConfig.catalog.ts` (catálogo, `SystemConfigKey`, `SystemConfigValue<K>`) e `systemConfig.definition.ts` (tipos de valor, conversão e serialização).
+Entre módulos, importe só **services** e **schemas** (a superfície pública). Controller de um módulo nunca importa controller de outro. O módulo `permissions` expõe também `permission.catalog.ts` (catálogo, `PermissionName`, `PermissionModule`, `ADMIN_ROLE`) e `permissions.select.ts` (`effectivePermissionsSelect({ userId } | { companyId })` + `toPermissionNames`, para ler usuário e permissões na mesma consulta). O módulo `systemConfigs` expõe `systemConfig.catalog.ts` (catálogo, `SystemConfigKey`, `SystemConfigValue<K>`) e `systemConfig.definition.ts` (tipos de valor, conversão e serialização). O módulo `audit` expõe `audit.catalog.ts` (`AuditEntity`, rótulos, campos pessoais) e `recordAuditService`; o `users` expõe `users.audit.ts` (`toUserRolesAuditSnapshot`, o formato "cargos do usuário" na trilha, usado pelos dois caminhos que o mudam).
 
 ### Anatomia de um endpoint — checklist para criar um novo
 
@@ -283,14 +287,15 @@ Exemplo: `PATCH /api/client/users/:userId`.
    - `xxxResponseSchema` com o shape exato da resposta (campos extras são descartados na serialização; `Date` do Prisma usa `dateTimeOutputSchema`).
    - `xxxRouteSchema = { tags, summary, description, security: [{ cookieAuth: [] }] (se protegida), body/querystring/params, response: { 200/201, 400, 401, 403, 404, 409... : errorResponseSchema } }`. Rota com permissão cita a exigida na `description` (``"Exige `backoffice.users.read`."``) e declara o 403.
 2. **Service** — `services/<verboEntidade>.service.ts`: recebe `{ companyId, ...dados }`, aplica regra, fala com o Prisma (`select` explícito, `...notDeleted`), lança `AppError`, devolve o dado. Sem `request`/`reply`.
-3. **Controller** — `controllers/<verboEntidade>.controller.ts`: `getAuthenticatedUser(request)`, chama o service, `reply.status(N).send(...)`. Nada de regra aqui.
-4. **Rota** — em `<módulo>.routes.ts`: `app.patch("/:userId", { schema: xxxRouteSchema, preHandler: requirePermission("backoffice.users.update") }, xxxController)`. Rotas com parâmetro por último. Rota raiz (`"/"`) com `prefixTrailingSlash: "no-slash"`. Permissão nova? Acrescente em `permission.catalog.ts` antes (ver **Sessão e autenticação**).
-5. **Tag nova?** Registre em `src/config/swagger.ts` com descrição.
-6. **Módulo novo?** Crie a pasta, exporte `xxxRoutes: FastifyPluginAsyncZod` e registre em `src/routes.ts` (dentro do grupo protegido, salvo rota pública).
-7. **Banco mudou?** Edite `prisma/schema.prisma`, rode `npm run db:migrate -- --name <descricao>`, adicione a tabela nova ao `TRUNCATE` de `src/tests/setup.ts` e, se fizer sentido, ao `prisma/seed.ts`.
-8. **Teste** em `src/tests/modules/<módulo>/<verboEntidade>.test.ts` (ver seção Testes), incluindo 403 sem a permissão e sucesso só com ela.
-9. `npm run openapi:export` e commite `docs/openapi.json`.
-10. `npm run check` verde.
+3. **Auditoria** — mutação (criar, editar, excluir, mudar status ou vínculo) grava `recordAuditService(...)` **pelo `tx` da escrita**, dentro da mesma `prisma.$transaction(async (tx) => ...)` (abra uma se a escrita não tinha). Entidade nova entra em `audit.catalog.ts`. Ver **Trilha de auditoria**. Leitura não grava.
+4. **Controller** — `controllers/<verboEntidade>.controller.ts`: `getAuthenticatedUser(request)`, chama o service, `reply.status(N).send(...)`. Nada de regra aqui.
+5. **Rota** — em `<módulo>.routes.ts`: `app.patch("/:userId", { schema: xxxRouteSchema, preHandler: requirePermission("backoffice.users.update") }, xxxController)`. Rotas com parâmetro por último. Rota raiz (`"/"`) com `prefixTrailingSlash: "no-slash"`. Permissão nova? Acrescente em `permission.catalog.ts` antes (ver **Sessão e autenticação**).
+6. **Tag nova?** Registre em `src/config/swagger.ts` com descrição.
+7. **Módulo novo?** Crie a pasta, exporte `xxxRoutes: FastifyPluginAsyncZod` e registre em `src/routes.ts` (dentro do grupo protegido, salvo rota pública).
+8. **Banco mudou?** Edite `prisma/schema.prisma`, rode `npm run db:migrate -- --name <descricao>`, adicione a tabela nova ao `TRUNCATE` de `src/tests/setup.ts` e, se fizer sentido, ao `prisma/seed.ts`.
+9. **Teste** em `src/tests/modules/<módulo>/<verboEntidade>.test.ts` (ver seção Testes), incluindo 403 sem a permissão e sucesso só com ela; mutação tem também o teste do registro de auditoria.
+10. `npm run openapi:export` e commite `docs/openapi.json`.
+11. `npm run check` verde.
 
 ### Formato das respostas
 
@@ -311,13 +316,14 @@ Exemplo: `PATCH /api/client/users/:userId`.
 
 - Query: `page` (**0-based**, padrão 0), `pageSize` (padrão 50, máx. 100), `orderBy` (allowlist), `order` (`asc`|`desc`), `search` (texto livre), filtros nomeados (`isActive=true`, listas `status=a,b,c` via `csvQuerySchema`).
 - Componha: `paginationQuerySchema.extend(sortQuerySchema([...campos], { orderBy, order }).shape).extend({ ...filtros })`.
+- Filtro múltiplo de valor fechado (enum): `csvQuerySchema.pipe(z.array(z.enum(Valores, { message })).optional())`, para valor fora da lista responder 400 em vez de chegar ao Prisma. Período: `<campo>From`/`<campo>To` com `dateTimeQuerySchema` (ISO 8601 UTC, com `Z`) e, no service, `toDateTimeRangeFilter(from, to)`, inclusivo nas duas pontas (`gte`/`lte`), ambos de `@/lib/http/query`. Referência: `listAuditLogsQuerySchema`.
 - No service: `toSkipTake(query)`, `orderBy: { [query.orderBy]: query.order }`, `$transaction([findMany, count])`.
 - Defina **sempre** uma ordenação padrão explícita.
 
 ### Sessão e autenticação
 
 - Login grava o cookie `token` (`SESSION_COOKIE_NAME`) com JWT curto (`sub` = id do usuário, expira em `SESSION_TTL_HOURS`). Logout limpa o cookie com as **mesmas opções** (`sessionCookieOptions`).
-- `requireSession` (hook `onRequest` do grupo protegido em `routes.ts`) valida o JWT, **recarrega do banco o usuário e as permissões efetivas numa leitura só** (bloqueio, exclusão e mudança de cargo valem na próxima requisição, sem novo login) e preenche `request.user`. O JWT não carrega permissão.
+- `requireSession` (hook `onRequest` do grupo protegido em `routes.ts`) valida o JWT, **recarrega do banco o usuário e as permissões efetivas numa leitura só** (bloqueio, exclusão e mudança de cargo valem na próxima requisição, sem novo login) e preenche `request.user`. O JWT não carrega permissão. Registra também o usuário como autor no contexto da requisição, lido só pela trilha de auditoria.
 - Em controller protegido use `getAuthenticatedUser(request)` — devolve `{ id, name, email, companyId, permissions }` já estreitado.
 - Login, register e `GET /users/me` devolvem também `user.idleTimeoutMinutes: number`, já resolvido por `resolveIdleTimeoutMinutesService` (ver **Configurações de sistema**). Quem desloga por inatividade é o cliente; o servidor não impõe o timeout (o JWT vale até `SESSION_TTL_HOURS`).
 - Rota pública nova (ex.: recuperação de senha) entra em `session.routes.ts` ou num módulo registrado **fora** do grupo protegido.
@@ -344,31 +350,65 @@ RBAC no padrão do sul-oxidos: base em `src/modules/permissions/` (catálogo, si
 - **Rotas** (`/api/client/roles`): `GET /permissions` (catálogo em árvore `{ modules: [{ module, moduleLabel, groups: [{ groupLabel, permissions: [{ id, name, action, label }] }] }] }`), `GET /` (paginado, `search` por nome, `orderBy` `name`/`createdAt`, com `permissionsCount` e `usersCount`) e `GET /:roleId` (com `permissions: [{ id, name }]`): `backoffice.roles.read`. `POST /` e `POST /:roleId/copy`: `backoffice.roles.create`. `PUT /:roleId`: `backoffice.roles.update`. `DELETE /:roleId`: `backoffice.roles.delete`. `GET /:roleId/users` (paginado): `backoffice.roles.read` **e** `backoffice.users.read` (expõe nome e e-mail). `PUT /:roleId/users`: `backoffice.roles.update` **e** `backoffice.users.update`. No módulo de usuários, `PUT /users/:userId/roles`: `backoffice.users.update`.
 - **Respostas**: `{ roles, count }`, `{ role }`, `{ message, role }` nas mutations (inclusive `PUT /:roleId/users`), `{ message }` na exclusão; `PUT /users/:userId/roles` responde `{ message, user }` com `user.roles: [{ id, name, isSystem }]`.
 - **Nome** único na empresa **inclusive contra cargos excluídos** (409, com mensagem própria quando o dono do nome está excluído): `assertRoleNameAvailableService` antes de gravar; corrida residual cai no P2002 (409 genérico).
-- **Permissões do cargo**: `permissionIds` com ao menos um item (400 do schema) e todos existentes no catálogo (400). `resolveRolePermissionIdsService` tira repetição e aplica a **expansão automática**: qualquer ação de escrita (tudo que não é `read`) de um grupo implica o `read` do mesmo grupo (`module` + `groupLabel`). A edição substitui o conjunto inteiro numa transação que grava o cargo primeiro (a linha travada serializa edições simultâneas do mesmo cargo).
+- **Permissões do cargo**: `permissionIds` com ao menos um item (400 do schema) e todos existentes no catálogo (400). `resolveRolePermissionIdsService` tira repetição e aplica a **expansão automática**: qualquer ação de escrita (tudo que não é `read`) de um grupo implica o `read` do mesmo grupo (`module` + `groupLabel`). A edição substitui o conjunto inteiro numa transação que começa travando a linha do cargo (`SELECT ... FOR NO KEY UPDATE`, a mesma força do `UPDATE`): edições simultâneas do mesmo cargo se serializam e o estado anterior lido logo depois (para a trilha de auditoria) é exato.
 - **Cargo de sistema** (`isSystem`, o `Administrador`): não é editado, excluído nem copiado, e os usuários dele não mudam por `PUT /roles/:roleId/users` (400). Dar ou tirar o `Administrador` de alguém é só por `PUT /users/:userId/roles`, só por quem também é Administrador (ver **Anti-escalonamento**), e guarda o último administrador ativo.
 - **Exclusão** lógica (`deletedAt`); cargo com usuários vinculados (não excluídos; bloqueado conta) responde 400. Vínculos restantes (de usuários excluídos) saem junto.
 - **Cópia**: nome `"<nome> (cópia)"`, depois `(cópia 2)`... (o primeiro livre, contando excluídos), mesma descrição e permissões, sem usuários, nunca de sistema.
 - **Anti-escalonamento** (decisão do dono, mais estrita que o sul-oxidos): ninguém acrescenta a um cargo, nem atribui a alguém, uma permissão que não possui. `assertCanGrantPermissionsService` (módulo `permissions`) responde **403** `"Você não pode conceder permissões que não possui."` quando: criar ou copiar cargo com permissão fora das efetivas do autor (no create, conta o conjunto já expandido, com o `read` implícito); editar cargo **acrescentando** permissão que o autor não tem (manter ou retirar as que o cargo já tem é permitido); atribuir a alguém (pelos dois caminhos, `PUT /roles/:roleId/users` e `PUT /users/:userId/roles`) cargo com permissão fora das efetivas do autor (continuar num cargo, ou tirar alguém dele, não é atribuição). O cargo `Administrador` só é atribuído ou retirado por quem tem o cargo `Administrador` (403 `"Só quem tem o cargo \"Administrador\" pode atribuí-lo ou retirá-lo de alguém."`), mesmo que o autor tenha todas as permissões por outro cargo. A checagem roda **dentro da transação da escrita**, logo antes dela, e relê as permissões efetivas do autor pelo `tx` (`findEffectivePermissionsService(..., tx)`). Todo caminho novo que concede permissão ou cargo passa por ela, com `actorId` e só com o que a mudança acrescenta.
 - **Ninguém altera os próprios cargos** (anti auto-bloqueio e auto-escalonamento), pelos dois caminhos: `PUT /users/:userId/roles` com o próprio id e `PUT /roles/:roleId/users` que inclua ou retire o próprio usuário respondem 400 (`OWN_ROLES_CHANGE_MESSAGE`). Continuar num cargo que já tem não é alteração. Os services que mudam cargo ou vínculo (`createRole`, `copyRole`, `updateRole`, `setRoleUsers`, `setUserRoles`) recebem `actorId` por argumento, nunca leem a requisição.
 - **Trava**: as mudanças de vínculo usuário-cargo (`setUserRolesService`, `setRoleUsersService`) e a exclusão de cargo tomam `lockCompanyAdminsService` e validam **dentro da transação, depois da trava** (cargo, usuário alvo e ids do corpo, todos filtrando `deletedAt`): um vínculo gravado ao mesmo tempo que a exclusão é visto por ela e barra a exclusão; o cargo ou o usuário excluído ao mesmo tempo que um vínculo responde 404.
-- **Limite do corpo**: `permissionIds`, `roleIds` e `userIds` aceitam no máximo `MAX_BODY_IDS` (1000) ids (400 com `issues`). `PUT /roles/:roleId/users` lê só os ids da lista e o autor, e tira quem sai por `notIn`: cargo com mais usuários que o limite é gerido pelos cargos de cada usuário.
+- **Limite do corpo**: `permissionIds`, `roleIds` e `userIds` aceitam no máximo `MAX_BODY_IDS` (1000) ids (400 com `issues`). `PUT /roles/:roleId/users` lê só os ids da lista e o autor, e tira quem sai com `DELETE ... RETURNING` (SQL tagueado, mesmo filtro de `roleMembersWhere`), que devolve os ids apagados para a trilha de auditoria sem ler o cargo inteiro; depois lê os cargos restantes só desses usuários. Cargo com mais usuários que o limite é gerido pelos cargos de cada usuário.
 - **Tenant**: cargo, usuário ou vínculo de outra empresa responde 404, também quando vem num corpo (`roleIds`, `userIds`). A contagem e a listagem de usuários do cargo (`roleMembersWhere`) só consideram usuário não excluído da mesma empresa.
 
 ### Configurações de sistema
 
 Módulo `src/modules/systemConfigs/` (rotas `/api/client/system-configs`), escopo por **empresa**.
 
-- **Definições no código, valores no banco.** `SYSTEM_CONFIG_CATALOG` (`systemConfig.catalog.ts`) é a fonte única: `key`, `module` (`GENERAL`, `SECURITY`, `NOTIFICATIONS`), `label` e `description` pt-BR, `valueType` (`string`, `int`, `float`, `boolean`, `json`), `defaultValue` já no tipo e `rule` opcional (Zod sobre o valor convertido). A tabela `system_configs` guarda só `companyId + key → value` (texto); sem linha, vale o padrão.
-- **Acrescentar uma chave**: (1) uma entrada no catálogo, junto das chaves do mesmo `module` e na ordem em que a tela deve mostrá-la, com chave `<grupo>.<nomeCamelCase>`; (2) `defaultValue` no tipo do `valueType` (`int` → número: o compilador recusa a mistura) e, se houver, a `rule`, com mensagem pt-BR que não repete o valor; (3) nada a rodar: sem migration nem seed, a chave aparece para toda empresa com o padrão; (4) o teste do catálogo confere que o padrão passa pela própria regra. Nunca renomeie uma `key` (o valor gravado fica órfão). Endurecer a `rule` não invalida o que já foi gravado: o valor que não passa mais é lido como o padrão (na API e no código) até a empresa gravar de novo. Grupo novo entra em `SYSTEM_CONFIG_MODULES` e precisa de rótulo no frontend.
-- **Validação e gravação**: o schema do `PATCH` converte cada `value` pelo `valueType`, aplica a `rule` e entrega ao service o texto normalizado (`'020'` → `'20'`, e-mail em minúsculas, JSON compacto); a mensagem de erro é `<label>: <regra>`. O service faz `upsert` de cada item numa única `prisma.$transaction` interativa, na ordem do catálogo (dois lotes simultâneos travam as linhas na mesma ordem, sem deadlock), e relê a lista pelo mesmo `tx`.
+- **Definições no código, valores no banco.** `SYSTEM_CONFIG_CATALOG` (`systemConfig.catalog.ts`) é a fonte única: `key`, `module` (`GENERAL`, `SECURITY`, `NOTIFICATIONS`), `label` e `description` pt-BR, `valueType` (`string`, `int`, `float`, `boolean`, `json`), `defaultValue` já no tipo, `rule` opcional (Zod sobre o valor convertido) e `redactInAudit` opcional. A tabela `system_configs` guarda só `companyId + key → value` (texto); sem linha, vale o padrão.
+- **Acrescentar uma chave**: (1) uma entrada no catálogo, junto das chaves do mesmo `module` e na ordem em que a tela deve mostrá-la, com chave `<grupo>.<nomeCamelCase>`; (2) `defaultValue` no tipo do `valueType` (`int` → número: o compilador recusa a mistura) e, se houver, a `rule`, com mensagem pt-BR que não repete o valor; (3) nada a rodar: sem migration nem seed, a chave aparece para toda empresa com o padrão; (4) o teste do catálogo confere que o padrão passa pela própria regra; (5) se o valor pode ser dado pessoal (e-mail ou telefone de uma pessoa) ou sensível, marque `redactInAudit: true`: a trilha de auditoria registra que a chave mudou, com o valor trocado por `[omitido]` (hoje: `app.supportEmail`). Nunca renomeie uma `key` (o valor gravado fica órfão). Endurecer a `rule` não invalida o que já foi gravado: o valor que não passa mais é lido como o padrão (na API e no código) até a empresa gravar de novo. Grupo novo entra em `SYSTEM_CONFIG_MODULES` e precisa de rótulo no frontend.
+- **Validação e gravação**: o schema do `PATCH` converte cada `value` pelo `valueType`, aplica a `rule` e entrega ao service o texto normalizado (`'020'` → `'20'`, e-mail em minúsculas, JSON compacto); a mensagem de erro é `<label>: <regra>`. O service faz `upsert` de cada item numa única `prisma.$transaction` interativa, na ordem do catálogo, e relê a lista pelo mesmo `tx`. O primeiro comando da transação é a trava consultiva da empresa (`pg_advisory_xact_lock(hashtext(systemConfigsLockName(companyId)))`): lotes simultâneos da mesma empresa se revezam e cada um lê como "antes" o que o anterior confirmou; empresas diferentes não se esperam. Cada chave que mudou (antes efetivo, o padrão quando não havia linha, diferente do novo) vira um registro `SETTINGS`/`SystemConfig`/`update` com `entityId` = chave; a chave enviada sem mudança não gera registro. O teste da corrida usa `raceAgainstSystemConfigsBatch` de `src/tests/helpers/systemConfigsLock.ts`.
 - **Leitura no código**: `getSystemConfigValueService({ companyId, key }, client?)` devolve o valor no tipo do catálogo (`SystemConfigValue<K>`: `security.idleTimeoutMinutes` → `number`). Fora do módulo, não leia `prisma.systemConfig` direto.
 - **Timeout de inatividade**: cascata `User.idleTimeoutMinutes` → `security.idleTimeoutMinutes` da empresa → padrão do catálogo (20), em `resolveIdleTimeoutMinutesService`, entregue na sessão. A faixa (1 a 480) é `IDLE_TIMEOUT_MINUTES_RANGE` (`src/config/constants.ts`), a mesma no cadastro do usuário e na configuração.
 - **Permissões**: `GET` exige `backoffice.systemConfigs.read`; `PATCH`, `backoffice.systemConfigs.update`.
 - Fora do template por ora: tipo `secret` com valor cifrado e configuração global (sem empresa) com herança.
 
+### Trilha de auditoria
+
+Módulo `src/modules/audit/` (rotas `/api/client/audit-logs`, só leitura) e `src/lib/audit/` (contexto da requisição e cura do antes/depois). Toda mudança relevante numa empresa e todo login ficam em `AuditLog`, escopado por `companyId`. Padrão do sul-oxidos, portado para as convenções daqui.
+
+- **Regra**: toda mutação (criar, editar, excluir, mudar status, mudar vínculo) grava `recordAuditService(entradas, tx)` **pelo `tx` da própria escrita**, depois dela e dentro da mesma `prisma.$transaction(async (tx) => ...)` (abra uma se a escrita não tinha). Se a mutação falha, o registro some junto; se a gravação do registro falha, a mutação é desfeita: a trilha nunca diz que algo mudou quando não mudou. Leitura, logout e exportação não são auditados.
+- **Entrada** (`AuditEntry`): `companyId`, `module` (`USERS`: cadastro de usuários; `SECURITY`: login, bloqueio, cargos e vínculos; `SETTINGS`: configurações), `entity` (nome do model, tipo `AuditEntity`), `entityId` (a chave, no caso de configuração), `action` (`create`, `update`, `delete`, `statusChange`, `login`), `description`, `before`/`after`. Uma lista de entradas vai numa inserção só (um registro por item do lote).
+- **`before`/`after`**: passe a linha inteira (o `select` da consulta) ou o estado que o usuário edita (`toRoleAuditSnapshot`, `toUserRolesAuditSnapshot`). `pickAuditable` tira segredo (`password`, hash, token, segredo, pelo nome do campo) e metadados de linha (`id`, `companyId`, `createdAt`, `updatedAt`, `deletedAt`) e aplaina para primitivos (data vira ISO, lista de primitivos vira `"a, b"`, relação e objeto saem; lista vazia também sai, porque não se distingue de relação vazia). Lista que precisa aparecer vazia como `null` (cargos, permissões) vira texto no estado montado, com `toAuditListText`. `computeChangedFields` deriva `changedFields` (vazio em criação, exclusão e login). Depois do diff, o valor dos campos pessoais da entidade (`AUDIT_PERSONAL_FIELDS`: `name`, `email`, `phone` e `image` do `User`) e dos `redactedFields` da entrada vira `[omitido]` (`null` continua `null`). Segredo que mudou entra só pelo nome, em `hiddenChangedFields` (ex.: `password` no `PATCH /users/:userId`).
+- **`update` sem campo alterado não é gravado**: salvar sem mudar nada, chave de configuração reenviada com o mesmo valor, o mesmo conjunto de cargos.
+- **`description`**: frase pt-BR no passado, sem nome, e-mail ou outro dado pessoal e sem o nome do registro: `"Cadastrou um usuário"`, `"Bloqueou um usuário"`, `"Alterou uma configuração"`. O que mudou está em `changedFields` e em `before`/`after`.
+- **Autor e metadados**: vêm do contexto da requisição (`@fastify/request-context` sobre `AsyncLocalStorage`, registrado em `app.ts`): `requestId` (o `reqId` do pino), `ip` e `userAgent` (cortado em `AUDIT_USER_AGENT_MAX_LENGTH`) em toda requisição, mais o `userId` que o `requireSession` acrescenta (`setAuditActor`). Só `recordAuditService` lê esse contexto (`getAuditRequestMetadata`); regra de negócio recebe autor, empresa e dados por argumento, nunca daqui. Rota pública (login, register) passa `userId` explícito na entrada. Fora de uma requisição (seed, script) o registro fica sem autor (ação do sistema).
+- **"Antes" exato**: leia o estado anterior dentro do `tx`, **depois da trava** que serializa quem escreve o mesmo registro: `SELECT id FROM <tabela> WHERE id = ${id} FOR NO KEY UPDATE` na linha (edição e exclusão de usuário, edição de cargo), a trava da empresa (`lockCompanyAdminsService`) nos vínculos e na exclusão de cargo, a trava consultiva por empresa nos lotes de configuração. Sem ela, duas escritas simultâneas registram o mesmo "antes". `FOR NO KEY UPDATE` é a força do próprio `UPDATE`: não barra quem só insere vínculo apontando para a linha.
+- **Eventos gravados**:
+
+  | Mutação | `module` / `entity` / `action` | `entityId` | `before` → `after` |
+  | --- | --- | --- | --- |
+  | `POST /users` | `USERS` / `User` / `create` | usuário | nada → linha do usuário |
+  | `PATCH /users/:userId` | `USERS` / `User` / `update` (campos cadastrais; senha só em `changedFields`) e, se `isActive` mudou, também `SECURITY` / `User` / `statusChange` (`"Bloqueou um usuário"` ou `"Desbloqueou um usuário"`) | usuário | linha → linha, sem `isActive`; `{ isActive }` → `{ isActive }` |
+  | `DELETE /users/:userId` | `USERS` / `User` / `delete` | usuário | linha → nada |
+  | `PUT /users/:userId/roles` | `SECURITY` / `User` / `update` | usuário | `{ roles }` → `{ roles }` (nomes dos cargos) |
+  | `PUT /roles/:roleId/users` | `SECURITY` / `User` / `update`, um registro por usuário que entra ou sai | usuário | `{ roles }` → `{ roles }`, como acima |
+  | `POST /roles`, `POST /roles/:roleId/copy` | `SECURITY` / `Role` / `create` | cargo novo | nada → `{ name, description, permissions }` |
+  | `PUT /roles/:roleId` | `SECURITY` / `Role` / `update` | cargo | `{ name, description, permissions }` → idem |
+  | `DELETE /roles/:roleId` | `SECURITY` / `Role` / `delete` | cargo | `{ name, description, permissions }` → nada |
+  | `PATCH /system-configs` | `SETTINGS` / `SystemConfig` / `update`, um registro por chave alterada | chave | `{ value }` → `{ value }` (efetivos; `[omitido]` com `redactInAudit`) |
+  | `POST /session/login` (sucesso) | `SECURITY` / `User` / `login`, autor = o próprio usuário | usuário | nada |
+  | `POST /session/register` | `USERS` / `User` / `create`, autor = o próprio usuário | usuário | nada → linha do usuário |
+
+- **Entidade nova**: acrescente o nome do model em `AUDIT_ENTITIES` (`audit.catalog.ts`); o compilador passa a exigir o rótulo pt-BR em `AUDIT_ENTITY_LABELS` e os campos pessoais em `AUDIT_PERSONAL_FIELDS` (`[]` quando não há). Módulo ou ação nova: valor no enum do `schema.prisma` (migration) e rótulo em `AUDIT_MODULE_LABELS` / `AUDIT_ACTION_LABELS` (o `Record` não compila sem ele). O frontend recebe os rótulos por `GET /audit-logs/options` e mostra o valor cru do que não conhecer.
+- **Rotas** (todas com `backoffice.audit.read`): `GET /audit-logs` (paginado 0-based; filtros CSV `module`, `entity`, `action`, `userId`; `entityId` exato; `createdFrom`/`createdTo` ISO UTC inclusivos, por `dateTimeQuerySchema` + `toDateTimeRangeFilter` de `@/lib/http/query`; `search` em descrição, entidade, `entityId` e nome do autor; `orderBy` `createdAt`, `module`, `entity`, `action`, `description`, padrão `createdAt desc`, desempate por `id`) → `{ logs: [{ id, module, entity, entityId, action, description, changedFields, userId, userName, createdAt }], count }`; `GET /audit-logs/options` → `{ modules, actions, entities }`, cada item `{ value, label }`; `GET /audit-logs/:auditLogId` → `{ auditLog: { ...item sem userName, before, after, user: { id, name, email } | null } }`, 404 `"Registro de auditoria não encontrado."` para outra empresa ou inexistente. `requestId`, `ip` e `userAgent` não saem pela API.
+- **Índices** de `audit_logs`: `[companyId, createdAt]` (lista padrão; cobre a FK `companyId`), `[companyId, entity, entityId]` (histórico de um registro: a aba "Atividade" filtra `entity=User&entityId=<id>` sem `module`, e o Postgres 17 não faz skip scan, então `module` não entra no meio do índice) e `[userId]` (o que um usuário fez).
+- **Nome do autor**: sempre pelo relacionamento com `User` (o nome atual, também de usuário excluído logicamente); o registro nunca guarda cópia. `userId` vira `null` só se o usuário for apagado de verdade (`onDelete: SetNull`).
+- **Teste**: toda mutação auditada tem teste em `src/tests/modules/audit/` (registro gravado, nenhum segredo nem dado pessoal no JSON, nada gravado quando a mutação falha).
+- Fora do template por ora: índice trigram para a busca textual (quando o volume pedir), política de retenção e anonimização da trilha, auditoria de leitura, logout e exportação.
+
 ### Multi-tenant e exclusão lógica
 
-- `Company` é o tenant. `User.companyId` é obrigatório. Toda entidade de negócio nova ganha `companyId` + `@@index([companyId])` e é filtrada por ele nos services. `Role` também é por empresa (cargo de outra empresa responde 404); só o catálogo `Permission` é global.
+- `Company` é o tenant. `User.companyId` é obrigatório. Toda entidade de negócio nova ganha `companyId` + `@@index([companyId])` e é filtrada por ele nos services. `Role`, `SystemConfig` e `AuditLog` também são por empresa (registro de outra empresa responde 404); só o catálogo `Permission` é global.
 - Exclusão é lógica: `deletedAt` + `@@index([deletedAt])`. Leitura filtra `...notDeleted` (de `@/lib/prisma`). Excluir = `update({ deletedAt: new Date() })`, nunca `delete`.
 - `email` de usuário continua único após exclusão lógica (decisão do template). Reativar = limpar `deletedAt`.
 
@@ -379,7 +419,7 @@ Módulo `src/modules/systemConfigs/` (rotas `/api/client/system-configs`), escop
 - Migrations: `npm run db:migrate -- --name <descricao>` em dev; `npm run db:deploy` em CI/produção. Nunca edite migration já aplicada.
 - Seed idempotente (`upsert`) em `prisma/seed.ts`; dados fictícios.
 - Transação: `prisma.$transaction([...])` para leituras em lote; `prisma.$transaction(async (tx) => ...)` para escrita atômica — passe `tx` para os services envolvidos quando precisar (assinatura `client: Prisma.TransactionClient = prisma`).
-- Regra que depende de contar linhas ("não pode ficar sem nenhum") checa e escreve na mesma transação, **depois de travar** a linha que agrupa o conjunto (ver **Último administrador**). SQL cru só por template tagueado (`` tx.$queryRaw`... ${valor}` ``), que vira parâmetro; nunca `$queryRawUnsafe` com valor interpolado.
+- Regra que depende de contar linhas ("não pode ficar sem nenhum") checa e escreve na mesma transação, **depois de travar** a linha que agrupa o conjunto (ver **Último administrador**). SQL cru só por template tagueado (`` tx.$queryRaw`... ${valor}` ``), que vira parâmetro; nunca `$queryRawUnsafe` com valor interpolado. Lista vai como um parâmetro só, com o tipo explícito: `` "userId" <> ALL(${ids}::text[]) `` (lista vazia funciona, ao contrário de `NOT IN ()`). Colunas em camelCase entre aspas, tabelas pelo nome do `@@map`.
 
 ### Variáveis de ambiente
 
@@ -406,7 +446,8 @@ O que `../frontend-template` já consome — mantenha compatível:
 - Upload: `POST /upload/file` com campo `file`, resposta com `Location`.
 - Datas trafegam como ISO 8601 UTC. Data sem hora vai como `AAAA-MM-DD` (coluna `@db.Date`).
 - `user.idleTimeoutMinutes` na sessão (login, register, `/users/me`): sempre um número já resolvido (usuário → empresa → 20), no nome que o frontend previu. No CRUD de usuários o mesmo campo é o valor **próprio** do usuário (`number | null`; null herda o da empresa), aceito em `POST /users` e `PATCH /users/:userId` (inteiro de 1 a 480, ou null).
-- Configurações de sistema: `GET /system-configs` → `{ systemConfigs: [{ key, module, label, description, valueType, value }] }`, sem `count`, na ordem do catálogo; `value` é **sempre string**. Gravação em lote atômica por `PATCH /system-configs` com `{ items: [{ key, value }] }`, resposta `{ message: "Configurações atualizadas.", systemConfigs }` (a tela não deve somar um toast próprio). Item inválido responde 400 com `issues` (`items.<i>.value` ou `items.<i>.key`) e `message` aberta pelo `label`. A chave é o identificador: não há `id`.
+- Configurações de sistema: `GET /system-configs` → `{ systemConfigs: [{ key, module, label, description, valueType, value }] }`, sem `count`, na ordem do catálogo; `value` é **sempre string**. Gravação em lote atômica por `PATCH /system-configs` com `{ items: [{ key, value }] }`, resposta `{ message: "Configurações atualizadas.", systemConfigs }` (a tela não deve somar um toast próprio). Item inválido responde 400 com `issues` (`path` `items.<i>.value` ou `items.<i>.key`; o `message` do issue começa pelo `label`), e o `message` do topo segue o padrão do projeto, `<path>: <mensagem do primeiro issue>` (ex.: `items.2.value: <label>: Informe um número inteiro.`). A chave é o identificador: não há `id`.
+- Auditoria: `GET /audit-logs` → `{ logs, count }` (`page` 0-based: o `+ 1` do mock do frontend sai), `GET /audit-logs/options` → `{ modules, actions, entities }` e `GET /audit-logs/:auditLogId` → `{ auditLog }` (envelope por entidade: o frontend desembrulha). `module` ∈ `USERS | SECURITY | SETTINGS`; `action` ∈ `create | update | delete | statusChange | login`; `before`/`after` só com valores primitivos e dado pessoal como `[omitido]`. A aba "Atividade" do usuário é a lista filtrada por `userId` (o que ele fez, índice `[userId]`) ou por `entity=User&entityId=<id>` (o que fizeram com ele, índice `[companyId, entity, entityId]`).
 - `../app-template` hoje roda em modo fake e espera token no header `Authorization` — ainda **não** é atendido por esta API (decisão: cookie apenas). Ao integrar o app, a decisão precisa ser revista aqui e no app.
 
 ### Swagger / OpenAPI

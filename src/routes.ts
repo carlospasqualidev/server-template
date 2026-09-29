@@ -1,6 +1,7 @@
 import { type FastifyPluginAsyncZod } from "fastify-type-provider-zod";
 
 import { requireSession } from "@/hooks/requireSession";
+import { auditRoutes } from "@/modules/audit/audit.routes";
 import { rolesRoutes } from "@/modules/roles/roles.routes";
 import { type SessionRoutesOptions, sessionRoutes } from "@/modules/session/session.routes";
 import { systemConfigsRoutes } from "@/modules/systemConfigs/systemConfigs.routes";
@@ -29,6 +30,7 @@ const clientRoutes: FastifyPluginAsyncZod<ApiRoutesOptions> = async (app, option
     protectedRoutes.register(usersRoutes, { prefix: "/users" });
     protectedRoutes.register(rolesRoutes, { prefix: "/roles" });
     protectedRoutes.register(systemConfigsRoutes, { prefix: "/system-configs" });
+    protectedRoutes.register(auditRoutes, { prefix: "/audit-logs" });
     protectedRoutes.register(uploadRoutes, { prefix: "/upload" });
   });
 };

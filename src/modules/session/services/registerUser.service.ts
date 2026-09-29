@@ -1,13 +1,17 @@
 import { hashPassword } from "@/lib/auth/password";
 import { ConflictError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { effectivePermissionsSelect, toPermissionNames } from "@/modules/permissions/permissions.select";
 import { createAdminRoleService } from "@/modules/permissions/services/createAdminRole.service";
 import { PERMISSION_CATALOG_LOCK_NAME } from "@/modules/permissions/services/syncPermissionCatalog.service";
 import { type RegisterBody } from "@/modules/session/schemas/register.schema";
 import { resolveIdleTimeoutMinutesService } from "@/modules/systemConfigs/services/resolveIdleTimeoutMinutes.service";
 
-/** Cria a empresa, o cargo `Administrador` dela e o usuário vinculado ao cargo, numa transação. */
+/**
+ * Cria a empresa, o cargo `Administrador` dela e o usuário vinculado ao cargo, numa transação, com o registro da
+ * criação do usuário na trilha de auditoria.
+ */
 export async function registerUserService({ name, email, password }: RegisterBody) {
   const emailInUse = await prisma.user.findUnique({ where: { email }, select: { id: true } });
 
@@ -27,7 +31,7 @@ export async function registerUserService({ name, email, password }: RegisterBod
     const company = await tx.company.create({ data: { name: `Empresa de ${name}` }, select: { id: true } });
     const adminRole = await createAdminRoleService({ companyId: company.id }, tx);
 
-    return tx.user.create({
+    const created = await tx.user.create({
       data: {
         companyId: company.id,
         name,
@@ -45,6 +49,23 @@ export async function registerUserService({ name, email, password }: RegisterBod
         userRoles: effectivePermissionsSelect({ companyId: company.id }),
       },
     });
+
+    // Autor = o próprio usuário: a rota é pública, a sessão só nasce com a resposta.
+    await recordAuditService(
+      {
+        companyId: company.id,
+        module: "USERS",
+        entity: "User",
+        entityId: created.id,
+        action: "create",
+        description: "Criou a própria conta",
+        after: created,
+        userId: created.id,
+      },
+      tx,
+    );
+
+    return created;
   });
 
   const { userRoles, companyId, idleTimeoutMinutes: userIdleTimeoutMinutes, ...summary } = user;

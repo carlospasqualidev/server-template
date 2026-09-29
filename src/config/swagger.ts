@@ -16,6 +16,10 @@ const tags: { name: string; description: string }[] = [
     description:
       "Configurações de sistema da empresa: catálogo definido no código, valores gravados por empresa, em lote.",
   },
+  {
+    name: "AuditLogs",
+    description: "Trilha de auditoria da empresa: quem mudou o quê, com antes e depois. Só leitura.",
+  },
   { name: "Upload", description: "Envio de arquivos para o storage." },
 ];
 

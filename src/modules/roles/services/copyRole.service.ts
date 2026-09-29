@@ -1,6 +1,8 @@
 import { assertExists, BadRequestError, ConflictError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
+import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
 import { roleDetailSelect, toRoleDetail } from "@/modules/roles/roles.select";
 
 /** Quantos nomes de cópia tentar: `X (cópia)`, `X (cópia 2)` ... `X (cópia 50)`. */
@@ -24,7 +26,7 @@ interface CopyRoleInput {
  * empresa (cargos excluídos também ocupam o nome). O cargo de sistema não é copiado.
  */
 export async function copyRoleService({ companyId, actorId, roleId }: CopyRoleInput) {
-  const role = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const source = await tx.role.findFirst({
       where: { id: roleId, companyId, ...notDeleted },
       select: { name: true, description: true, isSystem: true, rolePermissions: { select: { permissionId: true } } },
@@ -54,16 +56,31 @@ export async function copyRoleService({ companyId, actorId, roleId }: CopyRoleIn
       throw new ConflictError("Não foi possível gerar um nome para a cópia. Renomeie as cópias existentes.");
     }
 
-    return tx.role.create({
-      data: {
-        companyId,
-        name,
-        description: source.description,
-        rolePermissions: { createMany: { data: permissionIds.map((permissionId) => ({ permissionId })) } },
-      },
-      select: roleDetailSelect(companyId),
-    });
-  });
+    const role = toRoleDetail(
+      await tx.role.create({
+        data: {
+          companyId,
+          name,
+          description: source.description,
+          rolePermissions: { createMany: { data: permissionIds.map((permissionId) => ({ permissionId })) } },
+        },
+        select: roleDetailSelect(companyId),
+      }),
+    );
 
-  return toRoleDetail(role);
+    await recordAuditService(
+      {
+        companyId,
+        module: "SECURITY",
+        entity: "Role",
+        entityId: role.id,
+        action: "create",
+        description: "Copiou um cargo",
+        after: toRoleAuditSnapshot(role),
+      },
+      tx,
+    );
+
+    return role;
+  });
 }

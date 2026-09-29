@@ -1,3 +1,4 @@
+import { type AuditAction, type AuditModule, Prisma } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_ROLE, type PermissionName } from "@/modules/permissions/permission.catalog";
@@ -148,4 +149,43 @@ interface SystemConfigOverrides {
 /** Valor de configuração gravado pela empresa. */
 export async function createSystemConfig({ companyId, key, value }: SystemConfigOverrides) {
   return prisma.systemConfig.create({ data: { companyId, key, value } });
+}
+
+interface AuditLogOverrides {
+  companyId: string;
+  module?: AuditModule;
+  entity?: string;
+  entityId?: string | null;
+  action?: AuditAction;
+  description?: string | null;
+  changedFields?: string[];
+  before?: Prisma.InputJsonObject | null;
+  after?: Prisma.InputJsonObject | null;
+  /** Autor; ausente ou null = ação do sistema. */
+  userId?: string | null;
+  createdAt?: Date;
+}
+
+/** Registro da trilha gravado direto (sem passar por uma mutação), para semear listagem, filtro e detalhe. */
+export async function createAuditLog(overrides: AuditLogOverrides) {
+  return prisma.auditLog.create({
+    data: {
+      companyId: overrides.companyId,
+      module: overrides.module ?? "USERS",
+      entity: overrides.entity ?? "User",
+      entityId: overrides.entityId ?? null,
+      action: overrides.action ?? "update",
+      description: overrides.description ?? null,
+      changedFields: overrides.changedFields ?? [],
+      before: overrides.before ?? Prisma.DbNull,
+      after: overrides.after ?? Prisma.DbNull,
+      userId: overrides.userId ?? null,
+      ...(overrides.createdAt && { createdAt: overrides.createdAt }),
+    },
+  });
+}
+
+/** Registros da trilha da empresa, na ordem em que foram gravados (o id é uuid v7, crescente). */
+export async function findAuditLogs(companyId: string) {
+  return prisma.auditLog.findMany({ where: { companyId }, orderBy: { id: "asc" } });
 }

@@ -26,6 +26,7 @@ model Company {
   users         User[]
   roles         Role[]
   systemConfigs SystemConfig[]
+  auditLogs     AuditLog[]
 
   @@index([deletedAt])
   @@map("companies")
@@ -49,6 +50,7 @@ model User {
 
   company   Company    @relation(fields: [companyId], references: [id])
   userRoles UserRole[]
+  auditLogs AuditLog[]
 
   @@index([companyId])
   @@index([deletedAt])
@@ -142,4 +144,54 @@ model SystemConfig {
 
   @@unique([companyId, key])
   @@map("system_configs")
+}
+
+/// Agrupador funcional da trilha de auditoria. Rotulos pt-BR em `src/modules/audit/audit.catalog.ts`.
+enum AuditModule {
+  USERS
+  SECURITY
+  SETTINGS
+}
+
+/// Acao registrada na trilha de auditoria. Rotulos pt-BR em `src/modules/audit/audit.catalog.ts`.
+enum AuditAction {
+  create
+  update
+  delete
+  statusChange
+  login
+}
+
+/// Registro da trilha de auditoria: uma mudanca confirmada (ou um login) numa empresa, gravada na mesma transacao da
+/// mutacao por `recordAuditService`. So leitura pela API. `entity` e o nome do model afetado (`User`, `Role`,
+/// `SystemConfig`) e `entityId` o id dele, sem FK (polimorfico; a chave, no caso de configuracao). `before`/`after`
+/// guardam so valores primitivos, sem segredo e com dado pessoal substituido por um marcador. O nome do autor vem do
+/// relacionamento com `User`, nunca de copia aqui. `requestId`, `ip` e `userAgent` vem do contexto da requisicao e
+/// nao saem pela API. O indice `[companyId, createdAt]` tambem atende as consultas por `companyId`; o
+/// `[companyId, entity, entityId]` atende o historico de um registro (aba "Atividade": `entity` + `entityId`, sem
+/// `module`), sem depender de skip scan.
+model AuditLog {
+  id            String      @id @default(uuid(7))
+  companyId     String
+  module        AuditModule
+  entity        String
+  entityId      String?
+  action        AuditAction
+  description   String?
+  before        Json?
+  after         Json?
+  changedFields String[]    @default([])
+  userId        String?
+  requestId     String?
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime    @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entity, entityId])
+  @@index([userId])
+  @@map("audit_logs")
 }

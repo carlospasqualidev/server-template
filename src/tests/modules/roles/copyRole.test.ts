@@ -108,7 +108,7 @@ describe("POST /api/client/roles/:roleId/copy", () => {
 
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ message: "Você não pode conceder permissões que não possui." });
-      expect(await prisma.role.count({ where: { name: "Auditores (cópia)" } })).toBe(0);
+      expect(await prisma.role.count({ where: { companyId: actor.companyId, name: "Auditores (cópia)" } })).toBe(0);
     });
 
     it("autor com todas as permissões do cargo copia", async () => {

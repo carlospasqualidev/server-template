@@ -5764,6 +5764,959 @@
         }
       }
     },
+    "/api/client/audit-logs": {
+      "get": {
+        "summary": "Lista a trilha de auditoria da empresa",
+        "tags": [
+          "AuditLogs"
+        ],
+        "description": "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
+        "parameters": [
+          {
+            "schema": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "description": "Página, começando em 0."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "description": "Itens por página (máx. 100)."
+          },
+          {
+            "schema": {
+              "default": "createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "module",
+                "entity",
+                "action",
+                "description"
+              ]
+            },
+            "in": "query",
+            "name": "orderBy",
+            "required": false,
+            "description": "Campo de ordenação: createdAt, module, entity, action, description."
+          },
+          {
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "description": "Direção da ordenação."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "module",
+            "required": false,
+            "description": "Módulos, separados por vírgula: USERS, SECURITY, SETTINGS."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "entity",
+            "required": false,
+            "description": "Entidades, separadas por vírgula (ex.: `User,Role`)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "description": "Ações, separadas por vírgula: create, update, delete, statusChange, login."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "userId",
+            "required": false,
+            "description": "Autores (ids), separados por vírgula."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "entityId",
+            "required": false,
+            "description": "Id exato do registro afetado (a chave, no caso de configuração)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "createdFrom",
+            "required": false,
+            "description": "Início do período (inclusivo), ISO 8601 em UTC."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "createdTo",
+            "required": false,
+            "description": "Fim do período (inclusivo), ISO 8601 em UTC."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "description": "Busca na descrição, na entidade, no id do registro e no nome do autor (contém, sem diferenciar maiúsculas)."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Identificador do registro."
+                          },
+                          "module": {
+                            "type": "string",
+                            "enum": [
+                              "USERS",
+                              "SECURITY",
+                              "SETTINGS"
+                            ],
+                            "description": "Agrupador funcional. Rótulos em `GET /audit-logs/options`."
+                          },
+                          "entity": {
+                            "type": "string",
+                            "description": "Tipo do registro afetado, nome do model em PascalCase (`User`, `Role`, `SystemConfig`).",
+                            "example": "User"
+                          },
+                          "entityId": {
+                            "description": "Id do registro afetado (a chave, no caso de configuração), ou null.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "create",
+                              "update",
+                              "delete",
+                              "statusChange",
+                              "login"
+                            ],
+                            "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
+                          },
+                          "description": {
+                            "description": "Resumo pt-BR no passado, sem nome, e-mail ou outro dado pessoal.",
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "example": "Bloqueou um usuário"
+                          },
+                          "changedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão e login."
+                          },
+                          "userId": {
+                            "description": "Autor da ação; null quando foi o sistema.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "userName": {
+                            "description": "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema.",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "module",
+                          "entity",
+                          "entityId",
+                          "action",
+                          "description",
+                          "changedFields",
+                          "userId",
+                          "createdAt",
+                          "userName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de registros que atendem ao filtro (para paginação)."
+                    }
+                  },
+                  "required": [
+                    "logs",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/audit-logs/options": {
+      "get": {
+        "summary": "Opções dos filtros da trilha de auditoria",
+        "tags": [
+          "AuditLogs"
+        ],
+        "description": "Exige `backoffice.audit.read`. Módulos, ações e entidades com o rótulo pt-BR, mantidos no backend: entidade nova auditada aparece sem mudar o frontend.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Valor gravado no registro e aceito no filtro."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Rótulo pt-BR para exibir."
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Módulos (`module`)."
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Valor gravado no registro e aceito no filtro."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Rótulo pt-BR para exibir."
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Ações (`action`)."
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Valor gravado no registro e aceito no filtro."
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Rótulo pt-BR para exibir."
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Entidades auditadas (`entity`)."
+                    }
+                  },
+                  "required": [
+                    "modules",
+                    "actions",
+                    "entities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/audit-logs/{auditLogId}": {
+      "get": {
+        "summary": "Busca um registro da trilha de auditoria",
+        "tags": [
+          "AuditLogs"
+        ],
+        "description": "Exige `backoffice.audit.read`. Traz o antes, o depois e o autor. Registro de outra empresa ou inexistente responde 404.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "auditLogId",
+            "required": true,
+            "description": "ID do registro de auditoria."
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "auditLog": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do registro."
+                        },
+                        "module": {
+                          "type": "string",
+                          "enum": [
+                            "USERS",
+                            "SECURITY",
+                            "SETTINGS"
+                          ],
+                          "description": "Agrupador funcional. Rótulos em `GET /audit-logs/options`."
+                        },
+                        "entity": {
+                          "type": "string",
+                          "description": "Tipo do registro afetado, nome do model em PascalCase (`User`, `Role`, `SystemConfig`).",
+                          "example": "User"
+                        },
+                        "entityId": {
+                          "description": "Id do registro afetado (a chave, no caso de configuração), ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "create",
+                            "update",
+                            "delete",
+                            "statusChange",
+                            "login"
+                          ],
+                          "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
+                        },
+                        "description": {
+                          "description": "Resumo pt-BR no passado, sem nome, e-mail ou outro dado pessoal.",
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "example": "Bloqueou um usuário"
+                        },
+                        "changedFields": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão e login."
+                        },
+                        "userId": {
+                          "description": "Autor da ação; null quando foi o sistema.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "before": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Estado anterior, só com valores primitivos; null na criação e no login. Senha e hash nunca aparecem; dado pessoal aparece como `[omitido]`."
+                        },
+                        "after": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": [
+                                  "string",
+                                  "number",
+                                  "boolean",
+                                  "null"
+                                ]
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Estado posterior, no mesmo formato; null na exclusão e no login."
+                        },
+                        "user": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "Identificador do autor."
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "description": "Nome do autor."
+                                },
+                                "email": {
+                                  "type": "string",
+                                  "description": "E-mail do autor."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "email"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "module",
+                        "entity",
+                        "entityId",
+                        "action",
+                        "description",
+                        "changedFields",
+                        "userId",
+                        "createdAt",
+                        "before",
+                        "after",
+                        "user"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "auditLog"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/client/upload/file": {
       "post": {
         "summary": "Envia um arquivo para o storage",
@@ -6046,6 +6999,10 @@
     {
       "name": "SystemConfigs",
       "description": "Configurações de sistema da empresa: catálogo definido no código, valores gravados por empresa, em lote."
+    },
+    {
+      "name": "AuditLogs",
+      "description": "Trilha de auditoria da empresa: quem mudou o quê, com antes e depois. Só leitura."
     },
     {
       "name": "Upload",

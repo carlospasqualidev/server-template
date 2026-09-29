@@ -1,6 +1,8 @@
 import { assertExists, BadRequestError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
+import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
 import { type SaveRoleBody } from "@/modules/roles/schemas/role.schemas";
 import { assertRoleNameAvailableService } from "@/modules/roles/services/assertRoleNameAvailable.service";
 import { findRoleByIdService } from "@/modules/roles/services/findRoleById.service";
@@ -31,24 +33,24 @@ export async function updateRoleService({ companyId, actorId, roleId, data }: Up
   const permissionIds = await resolveRolePermissionIdsService(data.permissionIds);
 
   return prisma.$transaction(async (tx) => {
-    // O cargo é gravado primeiro: a linha travada serializa edições simultâneas do mesmo cargo, e a troca das
-    // permissões abaixo já enxerga o que a anterior confirmou (o conjunto final é o de uma delas, nunca a união).
-    // Cargo excluído nesse meio tempo não casa com o `where` e responde 404.
+    // A linha do cargo é travada primeiro (mesma força da trava do UPDATE, que não barra quem só vincula usuários):
+    // edições simultâneas do mesmo cargo se serializam, a seguinte relê o que a anterior confirmou (o conjunto final é
+    // o de uma delas, nunca a união) e o "antes" registrado na trilha é exato. Cargo excluído nesse meio tempo
+    // responde 404.
+    await tx.$queryRaw`SELECT id FROM roles WHERE id = ${roleId} FOR NO KEY UPDATE`;
+    const before = await findRoleByIdService({ companyId, roleId }, tx);
+
     await tx.role.update({
-      where: { id: roleId, ...notDeleted },
+      where: { id: roleId },
       data: { name: data.name, description: data.description || null },
       select: { id: true },
     });
 
     // Só o que entra no cargo é concedido: manter ou retirar uma permissão que o autor não tem é permitido.
-    const kept = await tx.rolePermission.findMany({
-      where: { roleId, permissionId: { in: permissionIds } },
-      select: { permissionId: true },
-    });
-    const keptIds = new Set(kept.map((rolePermission) => rolePermission.permissionId));
+    const currentIds = new Set(before.permissions.map((permission) => permission.id));
 
     await assertCanGrantPermissionsService(
-      { companyId, actorId, permissionIds: permissionIds.filter((permissionId) => !keptIds.has(permissionId)) },
+      { companyId, actorId, permissionIds: permissionIds.filter((permissionId) => !currentIds.has(permissionId)) },
       tx,
     );
 
@@ -58,6 +60,22 @@ export async function updateRoleService({ companyId, actorId, roleId, data }: Up
       skipDuplicates: true,
     });
 
-    return findRoleByIdService({ companyId, roleId }, tx);
+    const updated = await findRoleByIdService({ companyId, roleId }, tx);
+
+    await recordAuditService(
+      {
+        companyId,
+        module: "SECURITY",
+        entity: "Role",
+        entityId: roleId,
+        action: "update",
+        description: "Alterou um cargo",
+        before: toRoleAuditSnapshot(before),
+        after: toRoleAuditSnapshot(updated),
+      },
+      tx,
+    );
+
+    return updated;
   });
 }

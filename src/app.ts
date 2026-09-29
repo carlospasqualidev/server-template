@@ -5,6 +5,7 @@ import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
+import { fastifyRequestContext } from "@fastify/request-context";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
@@ -14,6 +15,7 @@ import { MAX_UPLOAD_FILE_SIZE_IN_BYTES } from "@/config/constants";
 import { corsOptions } from "@/config/cors";
 import { buildLoggerOptions } from "@/config/logger";
 import { swaggerOptions, swaggerUiOptions } from "@/config/swagger";
+import { buildAuditRequestMetadata } from "@/lib/audit/auditContext";
 import { errorHandler, notFoundHandler } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { healthRoutes } from "@/modules/health/health.routes";
@@ -31,6 +33,11 @@ export function buildApp(options: BuildAppOptions = {}) {
 
   app.decorateRequest("user", null);
 
+  // Contexto por requisição (AsyncLocalStorage): leva requestId, IP, user-agent e, depois do `requireSession`, o autor
+  // até a gravação da trilha de auditoria. Só a auditoria lê; regra de negócio recebe dados por argumento.
+  app.register(fastifyRequestContext, {
+    defaultStoreValues: (request) => ({ audit: buildAuditRequestMetadata(request) }),
+  });
   app.register(helmet);
   app.register(cors, corsOptions);
   app.register(cookie);

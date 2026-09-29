@@ -34,6 +34,11 @@ interface SystemConfigDefinitionOf<TType extends SystemConfigValueType> {
   defaultValue: SystemConfigValueByType[TType];
   /** Regra da chave sobre o valor já convertido (faixa, formato, tamanho). Sem ela, vale só o tipo. */
   rule?: z.ZodType<SystemConfigValueByType[TType], SystemConfigValueByType[TType]>;
+  /**
+   * O valor pode ser dado pessoal (ex.: e-mail de uma pessoa) ou sensível: a trilha de auditoria registra que a chave
+   * mudou, com o valor trocado por um marcador fixo em `before`/`after`.
+   */
+  redactInAudit?: true;
 }
 
 /** Definição de uma configuração. `valueType`, `defaultValue` e `rule` concordam entre si: `int` só aceita número. */

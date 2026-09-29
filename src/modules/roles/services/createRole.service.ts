@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
+import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
 import { roleDetailSelect, toRoleDetail } from "@/modules/roles/roles.select";
 import { type SaveRoleBody } from "@/modules/roles/schemas/role.schemas";
 import { assertRoleNameAvailableService } from "@/modules/roles/services/assertRoleNameAvailable.service";
@@ -17,20 +19,35 @@ export async function createRoleService({ companyId, actorId, data }: CreateRole
   await assertRoleNameAvailableService({ companyId, name: data.name });
   const permissionIds = await resolveRolePermissionIdsService(data.permissionIds);
 
-  const role = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     // O conjunto já expandido: o `read` implícito também é concedido.
     await assertCanGrantPermissionsService({ companyId, actorId, permissionIds }, tx);
 
-    return tx.role.create({
-      data: {
-        companyId,
-        name: data.name,
-        description: data.description || null,
-        rolePermissions: { createMany: { data: permissionIds.map((permissionId) => ({ permissionId })) } },
-      },
-      select: roleDetailSelect(companyId),
-    });
-  });
+    const role = toRoleDetail(
+      await tx.role.create({
+        data: {
+          companyId,
+          name: data.name,
+          description: data.description || null,
+          rolePermissions: { createMany: { data: permissionIds.map((permissionId) => ({ permissionId })) } },
+        },
+        select: roleDetailSelect(companyId),
+      }),
+    );
 
-  return toRoleDetail(role);
+    await recordAuditService(
+      {
+        companyId,
+        module: "SECURITY",
+        entity: "Role",
+        entityId: role.id,
+        action: "create",
+        description: "Criou um cargo",
+        after: toRoleAuditSnapshot(role),
+      },
+      tx,
+    );
+
+    return role;
+  });
 }

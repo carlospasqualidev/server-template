@@ -83,30 +83,33 @@ Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
 Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm permissão respondem 403 sem ela.
 
-| Método   | Rota                   | Protegida | Permissão                                             | Descrição                                                                     |
-| -------- | ---------------------- | --------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/session/login`       | não       |                                                       | Autentica e grava o cookie                                                    |
-| `POST`   | `/session/register`    | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
-| `POST`   | `/session/logout`      | não       |                                                       | Limpa o cookie                                                                |
-| `GET`    | `/users/me`            | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                   |
-| `GET`    | `/users`               | sim       | `backoffice.users.read`                               | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
-| `GET`    | `/users/:userId`       | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa)                                                  |
-| `POST`   | `/users`               | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                       |
-| `PATCH`  | `/users/:userId`       | sim       | `backoffice.users.update`                             | Atualização parcial                                                           |
-| `DELETE` | `/users/:userId`       | sim       | `backoffice.users.delete`                             | Exclusão lógica                                                               |
-| `PUT`    | `/users/:userId/roles` | sim       | `backoffice.users.update`                             | Define os cargos do usuário                                                   |
-| `GET`    | `/roles/permissions`   | sim       | `backoffice.roles.read`                               | Catálogo de permissões agrupado (módulo → grupo → permissões)                 |
-| `GET`    | `/roles`               | sim       | `backoffice.roles.read`                               | Lista paginada de cargos (`page`, `pageSize`, `orderBy`, `order`, `search`)   |
-| `GET`    | `/roles/:roleId`       | sim       | `backoffice.roles.read`                               | Cargo com as permissões                                                       |
-| `POST`   | `/roles`               | sim       | `backoffice.roles.create`                             | Cria cargo                                                                    |
-| `POST`   | `/roles/:roleId/copy`  | sim       | `backoffice.roles.create`                             | Copia cargo (permissões e descrição, sem usuários)                            |
-| `PUT`    | `/roles/:roleId`       | sim       | `backoffice.roles.update`                             | Edita nome, descrição e o conjunto de permissões                              |
-| `DELETE` | `/roles/:roleId`       | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                          |
-| `GET`    | `/roles/:roleId/users` | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                   |
-| `PUT`    | `/roles/:roleId/users` | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                   |
-| `GET`    | `/system-configs`      | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)          |
-| `PATCH`  | `/system-configs`      | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada     |
-| `POST`   | `/upload/file`         | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                     |
+| Método   | Rota                      | Protegida | Permissão                                             | Descrição                                                                     |
+| -------- | ------------------------- | --------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `POST`   | `/session/login`          | não       |                                                       | Autentica e grava o cookie                                                    |
+| `POST`   | `/session/register`       | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                |
+| `POST`   | `/session/logout`         | não       |                                                       | Limpa o cookie                                                                |
+| `GET`    | `/users/me`               | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                   |
+| `GET`    | `/users`                  | sim       | `backoffice.users.read`                               | Lista paginada (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`) |
+| `GET`    | `/users/:userId`          | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa)                                                  |
+| `POST`   | `/users`                  | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                       |
+| `PATCH`  | `/users/:userId`          | sim       | `backoffice.users.update`                             | Atualização parcial                                                           |
+| `DELETE` | `/users/:userId`          | sim       | `backoffice.users.delete`                             | Exclusão lógica                                                               |
+| `PUT`    | `/users/:userId/roles`    | sim       | `backoffice.users.update`                             | Define os cargos do usuário                                                   |
+| `GET`    | `/roles/permissions`      | sim       | `backoffice.roles.read`                               | Catálogo de permissões agrupado (módulo → grupo → permissões)                 |
+| `GET`    | `/roles`                  | sim       | `backoffice.roles.read`                               | Lista paginada de cargos (`page`, `pageSize`, `orderBy`, `order`, `search`)   |
+| `GET`    | `/roles/:roleId`          | sim       | `backoffice.roles.read`                               | Cargo com as permissões                                                       |
+| `POST`   | `/roles`                  | sim       | `backoffice.roles.create`                             | Cria cargo                                                                    |
+| `POST`   | `/roles/:roleId/copy`     | sim       | `backoffice.roles.create`                             | Copia cargo (permissões e descrição, sem usuários)                            |
+| `PUT`    | `/roles/:roleId`          | sim       | `backoffice.roles.update`                             | Edita nome, descrição e o conjunto de permissões                              |
+| `DELETE` | `/roles/:roleId`          | sim       | `backoffice.roles.delete`                             | Exclusão lógica (cargo sem usuários)                                          |
+| `GET`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.read` e `backoffice.users.read`     | Usuários do cargo, paginado                                                   |
+| `PUT`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                   |
+| `GET`    | `/system-configs`         | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)          |
+| `PATCH`  | `/system-configs`         | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada     |
+| `GET`    | `/audit-logs`             | sim       | `backoffice.audit.read`                               | Trilha de auditoria paginada (filtros, período, busca, ordenação)             |
+| `GET`    | `/audit-logs/options`     | sim       | `backoffice.audit.read`                               | Módulos, ações e entidades da trilha, com rótulo pt-BR                        |
+| `GET`    | `/audit-logs/:auditLogId` | sim       | `backoffice.audit.read`                               | Registro da trilha com antes, depois e autor                                  |
+| `POST`   | `/upload/file`            | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                     |
 
 Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `issues: [{ path, message }]`. O contrato completo, gerado dos schemas, fica em [`docs/openapi.json`](docs/openapi.json).
 
@@ -124,6 +127,10 @@ Login, register e `GET /users/me` devolvem `user = { id, name, email, image, per
 
 Cada empresa ajusta as configurações numa tela única. As definições (rótulo, tipo, padrão e regra de validação) ficam no código, em `src/modules/systemConfigs/systemConfig.catalog.ts`; o banco guarda só os valores que a empresa gravou, e o que não foi gravado vale o padrão. `value` trafega sempre como texto. A gravação é em lote e atômica: um item inválido responde 400 e nada é gravado. Chaves iniciais: `app.name`, `app.supportEmail`, `security.idleTimeoutMinutes` (padrão 20, de 1 a 480) e `notifications.email`. Como acrescentar uma chave: [`CLAUDE.md`](CLAUDE.md#configurações-de-sistema).
 
+## Trilha de auditoria
+
+Toda mudança relevante numa empresa (usuários, cargos, vínculos entre eles, configurações) e todo login ficam registrados com autor, antes e depois, gravados na mesma transação da mudança: se ela falha, nada é registrado. Quem tem `backoffice.audit.read` consulta a trilha da própria empresa em `/audit-logs`, com filtros por módulo, entidade, ação, autor, registro e período, busca e detalhe. A trilha não guarda senha nem hash, e troca por `[omitido]` o valor de dado pessoal (nome, e-mail, telefone e foto do usuário, e-mail de suporte); o nome do autor vem do cadastro. IP e user-agent da requisição são gravados, mas não saem pela API. Como instrumentar uma mutação nova: [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria).
+
 ## Estrutura
 
 ```
@@ -133,7 +140,7 @@ src/
   routes.ts         /api → /client → módulos (grupo protegido por requireSession)
   config/           env (Zod), constants, cors, logger, swagger
   hooks/            requireSession, requirePermission
-  lib/              prisma, errors, http (paginação/respostas), validation, auth, storage, format
+  lib/              prisma, errors, http (paginação/respostas), validation, auth, audit (contexto e antes/depois), storage, format
   modules/
     health/         liveness e readiness
     session/        login, register, logout
@@ -142,6 +149,7 @@ src/
     permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
     roles/          gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo
     systemConfigs/  configurações por empresa: catálogo no código, leitura, gravação em lote, timeout de inatividade
+    audit/          trilha de auditoria: gravação nas mutações, lista, detalhe e opções de filtro
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado
