@@ -117,7 +117,7 @@ Resumo: **consistência interna > inspiração externa > improvisar do zero.**
 - **Sessão** em cookie HTTP-only, `SameSite=Lax`, `Secure` em produção. Nada de token em body, query ou `localStorage`.
 - **Rate limit** em login, register e na troca da própria senha (`PUT /users/me/password`, que confere a senha atual), todos com `LOGIN_RATE_LIMIT` (e a mesma opção `loginRateLimitMax` do `buildApp` nos testes). Rotas novas sensíveis (recuperação de senha, envio de e-mail) também recebem `config: { rateLimit }`.
 - **Variáveis de ambiente** só em `src/config/env.ts` (validado com Zod). `process.env` fora dali é erro de lint.
-- Helmet e CORS por allowlist (`CORS_ORIGINS`) já estão ligados em `app.ts`, inclusive na resposta de erro do roteador, que não passa pelos hooks: ali os cabeçalhos saem do pacote `helmet` (os mesmos do `@fastify/helmet` sem opções; se ele falhar, a resposta sai assim mesmo e a falha vai ao log com `warn`) e de `corsHeadersFor` (`src/config/cors.ts`, espelho das `corsOptions`). Mudou as opções de um dos dois plugins, mude também o espelho. `CORS_ORIGINS` com `*` derruba a subida (`env.ts`): a sessão é cookie (credenciais), e o espelho compara cada origem literalmente.
+- Helmet e CORS por allowlist (`CORS_ORIGINS`) já estão ligados em `app.ts`, inclusive na resposta de erro do roteador, que não passa pelos hooks: ali os cabeçalhos saem do pacote `helmet` (os mesmos do `@fastify/helmet` sem opções; se ele falhar, a resposta sai assim mesmo e a falha vai ao log com `warn`) e de `corsHeadersFor` (`src/config/cors.ts`, espelho das `corsOptions`). Mudou as opções de um dos dois plugins, mude também o espelho. `CORS_ORIGINS` com `*` derruba a subida (`env.ts`): a sessão é cookie (credenciais), e o espelho compara cada origem literalmente. **Métodos liberados** (`methods` em `corsOptions`): `GET`, `HEAD`, `POST`, `PUT`, `PATCH` e `DELETE`, os que a API usa. Sem a lista, o plugin libera só `GET,HEAD,POST` e o navegador barra no preflight toda escrita por `PUT`, `PATCH` e `DELETE`; `OPTIONS` fica de fora porque o preflight não é conferido contra ela. Rota com método novo entra na lista. O espelho não leva `methods`: o cabeçalho só vai no preflight, e o preflight que cai no erro do roteador falha no navegador pelo status. Teste em `src/tests/config/cors.test.ts`.
 
 ### Object injection — nunca indexe objeto/array com variável
 
@@ -188,7 +188,7 @@ src/tests/
 │   └── multipart.ts               # buildMultipartBody([...]) para upload
 ├── modules/<módulo>/<endpoint>.test.ts
 ├── hooks/<hook>.test.ts
-├── config/<arquivo>.test.ts       # validação do ambiente (`loadEnv(source)`)
+├── config/<arquivo>.test.ts       # validação do ambiente (`loadEnv(source)`) e preflight do CORS (`cors.test.ts`)
 └── lib/<grupo>/<arquivo>.test.ts
 ```
 
