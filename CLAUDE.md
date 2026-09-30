@@ -236,7 +236,7 @@ src/
 ├── lib/                    # infraestrutura compartilhada; NÃO importa de modules/
 │   ├── prisma.ts           # client único + `notDeleted`
 │   ├── errors/             # AppError e filhos, assertExists, errorHandler, reportError
-│   ├── http/               # pagination, query (search/boolean/csv/intervalo de datas), responses (erro, message, data)
+│   ├── http/               # pagination, query (search/boolean/csv/intervalo de datas), responses (erro, message, data), security (`sessionSecurity`: cookie ou Bearer no OpenAPI)
 │   ├── validation/         # primitivos Zod pt-BR (email, senha, cpf, cnpj, cep, telefone, URL de imagem, datas)
 │   ├── auth/               # password (bcrypt), session (JWT, cookie ou Bearer, openSession), authenticatedUser
 │   ├── audit/              # contexto da requisição para a trilha (auditContext), cura do antes/depois (auditSnapshot), corte da retenção (auditRetention)
@@ -335,7 +335,7 @@ Exemplo: `PATCH /api/client/users/:userId`.
 
 ### Sessão e autenticação
 
-- Login grava o cookie `token` (`SESSION_COOKIE_NAME`) com JWT curto (`sub` = id do usuário, expira em `SESSION_TTL_HOURS`). Logout limpa o cookie com as **mesmas opções** (`sessionCookieOptions`).
+- Login na web (sem `X-Client-Type`) grava o cookie `token` (`SESSION_COOKIE_NAME`) com JWT curto (`sub` = id do usuário, expira em `SESSION_TTL_HOURS`). Logout limpa o cookie com as **mesmas opções** (`sessionCookieOptions`).
 - **Dois modos de entrega do mesmo JWT**, decididos por `openSession` (`@/lib/auth/session`) no login e no register: **web** (sem cabeçalho): cookie HTTP-only, token fora do corpo (a resposta é a de sempre, `{ success, user }`); **app nativo** (`X-Client-Type: mobile`, `MOBILE_CLIENT_TYPE`, o único valor aceito; outro responde 400 com issue em `x-client-type`): `{ success, user, token }` e **nenhum cookie**. Sem cookie no app por segurança: a pilha HTTP nativa (NSURLSession, OkHttp) guarda o `Set-Cookie` no pote de cookies do sistema, uma segunda cópia da credencial fora do armazenamento seguro, e ela manteria a sessão aberta depois que o app descarta o token no logout (sem `Authorization`, o `requireSession` lê o cookie). Mesmo JWT, mesmo TTL, sem refresh. Rate limit, trilha `login` e `lastLoginAt` são os mesmos nos dois modos (o service não sabe o modo).
 - O cabeçalho do cliente é declarado no schema da rota (`sessionClientHeadersSchema`, `src/modules/session/schemas/session.schemas.ts`), que vira parâmetro `in: header` no OpenAPI; o `token` da resposta é `sessionTokenSchema` (opcional). Rota nova que abre sessão usa os dois e `openSession`.
 - **Logout** responde `{ success }` nos dois modos e limpa o cookie. O JWT é sem estado e não é revogado: no app, logout é descartar o token do armazenamento seguro (ele valeria até expirar).
@@ -541,6 +541,7 @@ O que `../frontend-template` já consome — mantenha compatível:
 - Node >= 22.12 (`.nvmrc` = 22; CI roda em Node 22). `npm` com `package-lock.json`.
 - Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor.
 - bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
+- A imagem de runtime instala com `npm ci --omit=dev --omit=optional` (sem o CLI do Prisma nem o TypeScript, que o lockfile marca `devOptional`); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.
 
 ---
 

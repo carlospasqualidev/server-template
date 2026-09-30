@@ -1,6 +1,6 @@
 # Server Template
 
-API REST em Fastify 5 + Prisma 7 + Zod 4, com sessão por cookie HTTP-only, upload para S3, OpenAPI gerado dos schemas e suíte de integração contra um Postgres descartável. É o backend dos templates irmãos `frontend-template` (web) e `app-template` (mobile).
+API REST em Fastify 5 + Prisma 7 + Zod 4, com sessão por cookie HTTP-only na web e por `Authorization: Bearer` no app nativo, upload para S3, OpenAPI gerado dos schemas e suíte de integração contra um Postgres descartável. É o backend dos templates irmãos `frontend-template` (web) e `app-template` (mobile).
 
 As convenções para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](CLAUDE.md). Este README cobre stack, como rodar e a estrutura.
 
@@ -192,8 +192,16 @@ O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e crede
 
 ## Docker e produção
 
-- `Dockerfile` multi-stage: compila em `node:22-slim`, roda `dist/server.js` só com dependências de produção.
-- Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão. A subida depende disso: antes do `listen` o servidor sincroniza o catálogo de permissões e, se falhar, encerra com erro. O usuário do banco precisa poder criar a extensão `pg_trgm` (ver **Trilha de auditoria**).
+- `Dockerfile` multi-stage: compila em `node:22-slim`; a imagem padrão (`docker build .`, estágio `runtime`) roda `dist/server.js` só com dependências de produção, sem o CLI do Prisma, o TypeScript nem outra ferramenta de build. Por isso ela não roda migration.
+- Migrations rodam no pipeline, antes de subir a nova versão, por uma de duas vias:
+  - a imagem de migração do mesmo commit (estágio `migrate`: o de build, com o CLI do Prisma, o schema e as migrations), que roda `prisma migrate deploy` e sai:
+    ```bash
+    docker build --target migrate -t server-template-migrate .
+    docker run --rm -e DATABASE_URL="postgresql://..." server-template-migrate
+    ```
+  - ou o runner do CI, no checkout do repositório: `npm ci` e `npx prisma migrate deploy`, com `DATABASE_URL` no ambiente.
+- A subida depende das migrations: antes do `listen` o servidor sincroniza o catálogo de permissões (na própria imagem de runtime, sem passo à parte) e, se falhar, encerra com erro. O usuário do banco precisa poder criar a extensão `pg_trgm` (ver **Trilha de auditoria**).
+- O runtime instala com `--omit=dev --omit=optional` (o motivo está no `Dockerfile`). Dependência nova que traga o binário nativo como opcional (o `sharp`, por exemplo) fica sem ele nessa imagem: suba o container e confira antes do deploy.
 - Health checks para o orquestrador: `/health` (liveness) e `/health/ready` (readiness).
 - Retenção da trilha de auditoria: agendada pelo próprio servidor (03:00 UTC). Com cron externo, desligue-a (`AUDIT_RETENTION_ENABLED=false`) e rode na mesma imagem `node dist/scripts/runAuditRetention.js` (mesmas variáveis do servidor; sai com código 1 se falhar).
 - O processo encerra com `SIGTERM` fechando conexões (graceful shutdown); uma retenção em curso termina o lote atual antes (até 5 s).

@@ -17,13 +17,25 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN npm run build
 
+# Migração: o estágio de build tem o CLI do Prisma, o `prisma.config.ts`, o schema e as migrations. O
+# pipeline gera esta imagem do mesmo commit (`docker build --target migrate`) e a roda antes de subir
+# a versão nova, com `-e DATABASE_URL`. Fica antes do runtime para o `docker build` sem `--target`
+# continuar gerando a imagem de runtime, que não depende deste estágio.
+FROM build AS migrate
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # Runtime: só dependências de produção e o `dist`.
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production HUSKY=0
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
+# `--omit=optional` junto do `--omit=dev`: o `@prisma/client` declara o CLI do Prisma e o TypeScript
+# como peers opcionais, e o lockfile marca os dois, e tudo o que eles puxam, como `devOptional`, que o
+# npm só deixa de fora quando as duas categorias são omitidas. A única dependência opcional de produção
+# hoje é o `pg-cloudflare`, que o `pg` só carrega no Cloudflare Workers. Dependência nova que traga o
+# binário nativo como opcional (o `sharp`, por exemplo) ficaria sem ele na imagem: confira a subida.
+RUN npm ci --omit=dev --omit=optional --ignore-scripts
 COPY --from=build /app/dist ./dist
 EXPOSE 8080
-# As migrations rodam fora da imagem (CI/CD): `npx prisma migrate deploy`.
+# As migrations rodam antes, pela imagem do estágio `migrate` (ou `npx prisma migrate deploy` no CI).
 CMD ["node", "dist/server.js"]
