@@ -33,7 +33,10 @@ export function sortQuerySchema<const TField extends string>(
   defaults: { orderBy: NoInfer<TField>; order: "asc" | "desc" },
 ) {
   return z.object({
-    orderBy: z.enum(fields).default(defaults.orderBy).describe(`Campo de ordenação: ${fields.join(", ")}.`),
+    orderBy: z
+      .enum(fields)
+      .default(defaults.orderBy)
+      .describe(`Campo de ordenação: ${fields.join(", ")}.`),
     order: z.enum(["asc", "desc"]).default(defaults.order).describe("Direção da ordenação."),
   });
 }

@@ -41,7 +41,10 @@ export const cnpjSchema = z
   .trim()
   .regex(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/, "O CNPJ deve possuir o formato 00.000.000/0000-00.");
 
-export const cepSchema = z.string().trim().regex(/^\d{5}-?\d{3}$/, "O CEP deve possuir o formato 00000-000.");
+export const cepSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{5}-?\d{3}$/, "O CEP deve possuir o formato 00000-000.");
 
 export const urlSchema = z.url({ message: "URL inválida." });
 

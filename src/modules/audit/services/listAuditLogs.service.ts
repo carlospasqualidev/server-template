@@ -25,9 +25,11 @@ interface AuditLogListRow {
   createdAt: Date;
 }
 
-/** Termo da busca já resolvido: o padrão do `ILIKE` e o que casa fora de `audit_logs` (catálogo e autores). */
+/** Termo da busca já resolvido: os padrões do `ILIKE` e o que casa fora de `audit_logs` (catálogo e autores). */
 interface ContentSearch {
   pattern: string;
+  /** O mesmo termo na forma em que aparece no texto de um JSON (`toJsonContainsLikePattern`), para `before`/`after`. */
+  jsonPattern: string;
   entities: AuditEntity[];
   authorIds: string[];
 }
@@ -89,7 +91,7 @@ async function findAuthorIdsMatching(companyId: string, pattern: string): Promis
  * antes), descrição, id do registro e valores de `before`/`after` por trigrama (`pg_trgm`). Os de igualdade vêm
  * primeiro porque, quando o Postgres varre as linhas (termo curto ou muito comum), o `OR` para no primeiro que casa.
  */
-function toContentSearchSql({ pattern, entities, authorIds }: ContentSearch): Prisma.Sql {
+function toContentSearchSql({ pattern, jsonPattern, entities, authorIds }: ContentSearch): Prisma.Sql {
   const branches: Prisma.Sql[] = [];
 
   if (entities.length > 0) {
@@ -103,8 +105,8 @@ function toContentSearchSql({ pattern, entities, authorIds }: ContentSearch): Pr
   branches.push(
     Prisma.sql`log.description ILIKE ${pattern}`,
     Prisma.sql`log."entityId" ILIKE ${pattern}`,
-    Prisma.sql`${toJsonValuesText(Prisma.sql`log.before`)} ILIKE ${pattern}`,
-    Prisma.sql`${toJsonValuesText(Prisma.sql`log.after`)} ILIKE ${pattern}`,
+    Prisma.sql`${toJsonValuesText(Prisma.sql`log.before`)} ILIKE ${jsonPattern}`,
+    Prisma.sql`${toJsonValuesText(Prisma.sql`log.after`)} ILIKE ${jsonPattern}`,
   );
 
   return Prisma.sql`(${Prisma.join(branches, " OR ")})`;
@@ -153,6 +155,15 @@ function toWhereSql(companyId: string, query: ListAuditLogsQuery, search: Conten
 }
 
 /**
+ * Padrão do termo nos valores de `before`/`after`. O texto de um JSON guarda `"` e `\` escapados (`\"`, `\\`) e os
+ * caracteres de controle como `\n` ou `\u001f`, então o termo passa antes pela mesma forma (a de `JSON.stringify`, que
+ * é a do Postgres) e só depois pelo escape do `LIKE`. Sem isso, `C:\temp` ou `"VIP"` nunca casariam nos valores.
+ */
+function toJsonContainsLikePattern(term: string): string {
+  return toContainsLikePattern(JSON.stringify(term).slice(1, -1));
+}
+
+/**
  * Busca por conteúdo: o termo, como texto literal, na descrição, no id do registro, nos valores de `before`/`after`
  * (não no nome das chaves), na entidade (nome técnico ou rótulo) e no nome do autor.
  *
@@ -162,7 +173,12 @@ function toWhereSql(companyId: string, query: ListAuditLogsQuery, search: Conten
 async function resolveContentSearch(companyId: string, term: string): Promise<ContentSearch> {
   const pattern = toContainsLikePattern(term);
 
-  return { pattern, entities: findEntitiesMatching(term), authorIds: await findAuthorIdsMatching(companyId, pattern) };
+  return {
+    pattern,
+    jsonPattern: toJsonContainsLikePattern(term),
+    entities: findEntitiesMatching(term),
+    authorIds: await findAuthorIdsMatching(companyId, pattern),
+  };
 }
 
 /**

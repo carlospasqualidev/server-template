@@ -71,9 +71,17 @@ export type SystemConfigValue<TKey extends SystemConfigKey> = SystemConfigValueB
 /** Todas as chaves, na ordem do catálogo. */
 export const SYSTEM_CONFIG_KEYS: readonly SystemConfigKey[] = SYSTEM_CONFIG_CATALOG.map((definition) => definition.key);
 
+/**
+ * Definição de um texto que pode não ser chave do catálogo, ou `undefined`: para quem lê chave gravada, como a trilha
+ * de auditoria, onde um registro antigo guarda a chave de uma configuração que já saiu do catálogo.
+ */
+export function lookupSystemConfigDefinition(key: string): SystemConfigDefinition | undefined {
+  return SYSTEM_CONFIG_CATALOG.find((candidate) => candidate.key === key);
+}
+
 /** Definição da chave. `key` vem do tipo do catálogo, então sempre existe. */
 export function findSystemConfigDefinition(key: SystemConfigKey): SystemConfigDefinition {
-  const definition = SYSTEM_CONFIG_CATALOG.find((candidate) => candidate.key === key);
+  const definition = lookupSystemConfigDefinition(key);
 
   if (!definition) {
     throw new Error(`Configuração fora do catálogo: ${key}.`);

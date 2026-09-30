@@ -42,6 +42,33 @@ export const auditLogListItemSchema = auditLogBaseSchema.extend({
 
 const auditSnapshotSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).nullable();
 
+export const auditFieldChangeSchema = z.object({
+  field: z
+    .string()
+    .describe("Nome técnico do campo: chave estável para a tela, não para exibir.")
+    .meta({ examples: ["isActive"] }),
+  label: z
+    .string()
+    .describe("Rótulo pt-BR do campo, do catálogo do servidor; o nome técnico quando o campo não está nele.")
+    .meta({ examples: ["Ativo"] }),
+  from: z
+    .string()
+    .describe(
+      "Valor anterior, pronto para exibir: `[Vazio]` (ausente, nulo ou vazio), `Sim`/`Não`, data `dd/mm/aaaa` ou `dd/mm/aaaa hh:mm` (UTC), número com vírgula decimal (o valor de configuração pelo tipo da chave); `[omitido]` para segredo alterado (a senha) ou valor anonimizado. Id de referência sai como está.",
+    )
+    .meta({ examples: ["Sim"] }),
+  to: z
+    .string()
+    .describe("Valor posterior, no mesmo formato de `from`.")
+    .meta({ examples: ["Não"] }),
+});
+
+export const auditFieldChangesSchema = z
+  .array(auditFieldChangeSchema)
+  .describe(
+    "De→para legível, na ordem do catálogo de campos da entidade. Edição e mudança de status: os campos alterados. Criação: os campos gravados com valor, com `from` = `[Vazio]`. Exclusão: os campos do estado anterior com valor, com `to` = `[Vazio]`. Campo vazio dos dois lados não aparece. Login e exportação: vazio.",
+  );
+
 export const auditLogDetailSchema = auditLogBaseSchema.extend({
   before: auditSnapshotSchema.describe(
     "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`.",
@@ -57,4 +84,10 @@ export const auditLogDetailSchema = auditLogBaseSchema.extend({
     })
     .nullable()
     .describe("Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema."),
+  fieldChanges: auditFieldChangesSchema,
+});
+
+/** Item da linha do tempo de um registro: o da lista, com o de→para no lugar de `before`/`after`. */
+export const auditLogTimelineItemSchema = auditLogListItemSchema.extend({
+  fieldChanges: auditFieldChangesSchema,
 });

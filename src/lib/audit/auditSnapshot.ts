@@ -15,7 +15,12 @@ export const AUDIT_REDACTED_VALUE = "[omitido]";
  * Metadados de linha: já estão nas colunas do registro de auditoria (`entityId`, `companyId`, `createdAt`) ou não são
  * mudança de negócio (`updatedAt`, `deletedAt`: a exclusão é a própria ação `delete`).
  */
-const METADATA_FIELDS: ReadonlySet<string> = new Set(["id", "companyId", "createdAt", "updatedAt", "deletedAt"]);
+const AUDIT_METADATA_FIELDS = ["id", "companyId", "createdAt", "updatedAt", "deletedAt"] as const;
+
+/** Coluna que nunca entra na trilha por ser metadado de linha; fica fora do catálogo de rótulos de campo. */
+export type AuditMetadataField = (typeof AUDIT_METADATA_FIELDS)[number];
+
+const METADATA_FIELDS: ReadonlySet<string> = new Set(AUDIT_METADATA_FIELDS);
 
 /** Segredo nunca entra na trilha, em nenhuma entidade: senha, hash, token, segredo, com qualquer prefixo ou sufixo. */
 const SECRET_FIELD_PATTERN = /password|hash|token|secret/i;

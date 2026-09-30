@@ -96,9 +96,9 @@ describe("computeChangedFields", () => {
 
 describe("redactAuditable", () => {
   it("troca pelo marcador o valor dos campos informados e mantém null", () => {
-    expect(redactAuditable({ email: "ana@example.com", phone: null, isActive: true }, new Set(["email", "phone"]))).toEqual(
-      { email: AUDIT_REDACTED_VALUE, phone: null, isActive: true },
-    );
+    expect(
+      redactAuditable({ email: "ana@example.com", phone: null, isActive: true }, new Set(["email", "phone"])),
+    ).toEqual({ email: AUDIT_REDACTED_VALUE, phone: null, isActive: true });
   });
 
   it("sem campos ou sem objeto devolve o que recebeu", () => {

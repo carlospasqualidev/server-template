@@ -9,8 +9,13 @@ const GENERIC_MESSAGE = "Oops! Encontramos um problema e nossa equipe foi notifi
 
 const MAX_UPLOAD_FILE_SIZE_IN_MB = MAX_UPLOAD_FILE_SIZE_IN_BYTES / (1024 * 1024);
 
-/** Erros do próprio Fastify e plugins (código → mensagem pt-BR). */
+/**
+ * Erros do próprio Fastify e plugins (código → mensagem pt-BR). A mensagem original de alguns repete o caminho
+ * (`FST_ERR_MAX_PARAM_LENGTH`, `FST_ERR_BAD_URL`, do roteador): nunca a devolva.
+ */
 const fastifyErrorMessages = new Map<string, string>([
+  ["FST_ERR_MAX_PARAM_LENGTH", "Parâmetro da URL muito longo."],
+  ["FST_ERR_BAD_URL", "URL inválida."],
   ["FST_ERR_CTP_EMPTY_JSON_BODY", "Corpo da requisição vazio."],
   ["FST_ERR_CTP_INVALID_JSON_BODY", "JSON inválido."],
   ["FST_ERR_CTP_INVALID_MEDIA_TYPE", "Tipo de conteúdo não suportado."],
@@ -116,7 +121,8 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
   const statusCode = readStatusCode(error);
 
   if (statusCode < 500) {
-    const message = fastifyErrorMessages.get(readErrorCode(error)) ?? statusMessages.get(statusCode) ?? "Requisição inválida.";
+    const message =
+      fastifyErrorMessages.get(readErrorCode(error)) ?? statusMessages.get(statusCode) ?? "Requisição inválida.";
     request.log.warn({ err: error }, message);
 
     return reply.status(statusCode).send({ message });

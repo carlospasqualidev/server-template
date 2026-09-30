@@ -1,4 +1,5 @@
 import { toAuditListText } from "@/lib/audit/auditSnapshot";
+import { type AuditFieldValues } from "@/modules/audit/audit.catalog";
 import { type UserCrudRow } from "@/modules/users/users.select";
 
 /**
@@ -14,5 +15,7 @@ export function toUserAuditState({ lastLoginAt: _lastLoginAt, userRoles: _userRo
  * e `PUT /roles/:roleId/users`): os nomes dos cargos em ordem alfabética, como texto (`null` sem nenhum cargo).
  */
 export function toUserRolesAuditSnapshot(roleNames: readonly string[]): { roles: string | null } {
-  return { roles: toAuditListText(roleNames.toSorted((left, right) => left.localeCompare(right, "pt-BR"))) };
+  return {
+    roles: toAuditListText(roleNames.toSorted((left, right) => left.localeCompare(right, "pt-BR"))),
+  } satisfies AuditFieldValues<"User">;
 }

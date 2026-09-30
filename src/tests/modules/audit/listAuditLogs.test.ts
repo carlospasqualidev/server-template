@@ -355,6 +355,41 @@ describe("GET /api/client/audit-logs", () => {
       expect(await search("C:\\t")).toEqual([backslash.id]);
     });
 
+    it('`\\` e `"` casam nos valores do JSON, que o texto do jsonb guarda escapados', async () => {
+      const admin = await createUser();
+      const quoted = await createAuditLog({ companyId: admin.companyId, after: { name: 'Cliente "VIP" Ltda' } });
+      await createAuditLog({ companyId: admin.companyId, after: { name: "Cliente VIP Ltda" } });
+      const backslash = await createAuditLog({ companyId: admin.companyId, before: { image: "C:\\fotos\\ana.png" } });
+      await createAuditLog({ companyId: admin.companyId, before: { image: "C:fotos/ana.png" } });
+      const both = await createAuditLog({ companyId: admin.companyId, after: { name: 'Pasta "D:\\dados"' } });
+
+      const search = async (text: string) => ids(await listLogs(admin.id, `?search=${encodeURIComponent(text)}`));
+
+      expect(await search('"VIP"')).toEqual([quoted.id]);
+      expect(await search("C:\\fotos\\ana")).toEqual([backslash.id]);
+      expect(await search('"d:\\DADOS"')).toEqual([both.id]);
+    });
+
+    it("valor numérico, booleano e data dentro do JSON casam pelo texto gravado", async () => {
+      const admin = await createUser();
+      const numeric = await createAuditLog({ companyId: admin.companyId, after: { idleTimeoutMinutes: 45 } });
+      await createAuditLog({ companyId: admin.companyId, after: { idleTimeoutMinutes: 30 } });
+      const boolean = await createAuditLog({ companyId: admin.companyId, before: { isActive: false } });
+      await createAuditLog({ companyId: admin.companyId, before: { isActive: true } });
+      const date = await createAuditLog({
+        companyId: admin.companyId,
+        after: { lastLoginAt: "2026-03-15T10:20:00.000Z" },
+      });
+      await createAuditLog({ companyId: admin.companyId, after: { lastLoginAt: "2026-04-01T08:00:00.000Z" } });
+
+      const search = async (text: string) => ids(await listLogs(admin.id, `?search=${encodeURIComponent(text)}`));
+
+      expect(await search("45")).toEqual([numeric.id]);
+      expect(await search("false")).toEqual([boolean.id]);
+      expect(await search("2026-03-15")).toEqual([date.id]);
+      expect(await search("2026-03-15T10:20")).toEqual([date.id]);
+    });
+
     it("busca combinada com filtro: os dois valem juntos", async () => {
       const admin = await createUser();
       const match = await createAuditLog({

@@ -56,7 +56,7 @@ export async function updateSystemConfigsService({ companyId, items }: UpdateSys
     // Um registro por chave alterada: o antes e o depois já normalizados se comparam como texto, e a chave enviada
     // sem mudança não gera registro (`update` sem campo alterado não é gravado).
     await recordAuditService(
-      orderedItems.map(({ key, value }): AuditEntry => {
+      orderedItems.map(({ key, value }): AuditEntry<"SystemConfig"> => {
         const definition = findSystemConfigDefinition(key);
 
         return {

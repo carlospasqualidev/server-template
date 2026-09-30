@@ -30,10 +30,10 @@ interface UserChange {
  * Registros da edição: `update` (módulo `USERS`) com os campos cadastrais e, quando o status muda, um `statusChange`
  * (módulo `SECURITY`) só com `isActive`. A senha trocada aparece só como campo alterado, sem valor.
  */
-function toUserChangeAuditEntries({ companyId, before, after, passwordChanged }: UserChange): AuditEntry[] {
+function toUserChangeAuditEntries({ companyId, before, after, passwordChanged }: UserChange): AuditEntry<"User">[] {
   const { isActive: wasActive, ...fieldsBefore } = before;
   const { isActive, ...fieldsAfter } = after;
-  const entries: AuditEntry[] = [
+  const entries: AuditEntry<"User">[] = [
     {
       companyId,
       module: "USERS",

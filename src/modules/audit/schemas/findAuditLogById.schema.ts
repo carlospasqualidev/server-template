@@ -11,7 +11,7 @@ export const findAuditLogByIdRouteSchema = {
   tags: ["AuditLogs"],
   summary: "Busca um registro da trilha de auditoria",
   description:
-    "Exige `backoffice.audit.read`. Traz o antes, o depois e o autor. Registro de outra empresa ou inexistente responde 404.",
+    "Exige `backoffice.audit.read`. Traz o antes, o depois, o autor e o de→para legível (`fieldChanges`: rótulo pt-BR e valores formatados). Registro de outra empresa ou inexistente responde 404.",
   security: [{ cookieAuth: [] }],
   params: auditLogParamsSchema,
   response: {

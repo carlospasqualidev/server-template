@@ -61,7 +61,7 @@ function toMembershipAuditEntry({
   roleNamesBefore,
   roleNamesAfter,
   description,
-}: MembershipChange): AuditEntry {
+}: MembershipChange): AuditEntry<"User"> {
   return {
     companyId,
     module: "SECURITY",
@@ -113,17 +113,19 @@ export async function setRoleUsersService({ companyId, actorId, roleId, userIds 
       throw new BadRequestError(OWN_ROLES_CHANGE_MESSAGE);
     }
 
-    const auditEntries: AuditEntry[] = [];
+    const auditEntries: AuditEntry<"User">[] = [];
 
     if (added.length > 0) {
       // Limitada pela lista do corpo; o nome vai para a frase da trilha. Volta na ordem do corpo (`added` segue a
-      // lista), não na que o banco devolveu: os registros da trilha saem na mesma ordem a cada chamada.
+      // lista), não na que o banco devolveu: os registros da trilha saem na mesma ordem a cada chamada. A posição vem
+      // de um `Map`, lido em tempo constante pelo comparador (um `indexOf` ali custaria uma varredura por comparação).
+      const positionInBody = new Map(added.map((userId, position) => [userId, position]));
       const addedUsers = (
         await tx.user.findMany({
           where: { id: { in: added }, companyId, ...notDeleted },
           select: { id: true, name: true },
         })
-      ).toSorted((first, second) => added.indexOf(first.id) - added.indexOf(second.id));
+      ).toSorted((first, second) => (positionInBody.get(first.id) ?? 0) - (positionInBody.get(second.id) ?? 0));
 
       if (addedUsers.length !== added.length) {
         throw new NotFoundError("Um ou mais usuários informados não existem na base de dados.");
