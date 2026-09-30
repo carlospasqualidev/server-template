@@ -710,7 +710,7 @@
         "tags": [
           "Users"
         ],
-        "description": "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos) e filtros, inclusive o período de cadastro (`createdFrom`/`createdTo`, inclusivos). Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
+        "description": "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos; `isActive` em `asc` traz os bloqueados antes dos ativos) e filtros, inclusive o período de cadastro (`createdFrom`/`createdTo`, inclusivos). Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
         "parameters": [
           {
             "schema": {
@@ -744,13 +744,14 @@
                 "name",
                 "email",
                 "createdAt",
-                "lastLoginAt"
+                "lastLoginAt",
+                "isActive"
               ]
             },
             "in": "query",
             "name": "orderBy",
             "required": false,
-            "description": "Campo de ordenação: name, email, createdAt, lastLoginAt."
+            "description": "Campo de ordenação: name, email, createdAt, lastLoginAt, isActive."
           },
           {
             "schema": {

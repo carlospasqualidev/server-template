@@ -2,6 +2,7 @@ import { type FastifyError, type FastifyReply, type FastifyRequest } from "fasti
 import { hasZodFastifySchemaValidationErrors, isResponseSerializationError } from "fastify-type-provider-zod";
 
 import { MAX_UPLOAD_FILE_SIZE_IN_BYTES } from "@/config/constants";
+import { maskSearchInText } from "@/config/logger";
 import { AppError } from "@/lib/errors/appError";
 import { reportError } from "@/lib/errors/reportError";
 
@@ -79,6 +80,28 @@ function readErrorCode(error: unknown): string {
 }
 
 /**
+ * O erro como vai para o log. A mensagem (e a pilha, que a repete) de `FST_ERR_BAD_URL` traz a URL inteira, com a
+ * query: ali a busca sai mascarada, como no registro da requisição. Cópia do mesmo tipo, para o serializador de erro
+ * do pino gravar os mesmos campos; o erro original, sem busca a mascarar, vai como está. Valor lançado que não é
+ * `Error` pode não ter `message` ou `stack` em texto: o campo que não for string fica como veio.
+ */
+function errorForLog(error: Error, url: string): Error {
+  const { message, stack } = error as { message?: unknown; stack?: unknown };
+  const maskedMessage = typeof message === "string" ? maskSearchInText(message, url) : message;
+  const maskedStack = typeof stack === "string" ? maskSearchInText(stack, url) : stack;
+
+  if (maskedMessage === message && maskedStack === stack) {
+    return error;
+  }
+
+  const masked: Error = Object.assign(Object.create(Object.getPrototypeOf(error)), error);
+  Object.defineProperty(masked, "message", { value: maskedMessage, writable: true, configurable: true });
+  Object.defineProperty(masked, "stack", { value: maskedStack, writable: true, configurable: true });
+
+  return masked;
+}
+
+/**
  * Tradutor único de erro → resposta HTTP `{ message, ... }`.
  * Ordem: AppError → validação Zod (400) → serialização (500, bug de contrato) → Prisma → erros do Fastify (4xx) → 500.
  */
@@ -123,7 +146,7 @@ export function errorHandler(error: FastifyError | Error, request: FastifyReques
   if (statusCode < 500) {
     const message =
       fastifyErrorMessages.get(readErrorCode(error)) ?? statusMessages.get(statusCode) ?? "Requisição inválida.";
-    request.log.warn({ err: error }, message);
+    request.log.warn({ err: errorForLog(error, request.url) }, message);
 
     return reply.status(statusCode).send({ message });
   }

@@ -399,6 +399,49 @@ describe("GET /api/client/users", () => {
     }
   });
 
+  it("ordena por status, bloqueados antes no asc e ativos antes no desc, com desempate por id nos dois sentidos", async () => {
+    const company = await createCompany();
+    const admin = await createUser({ companyId: company.id, name: "Admin" });
+    // Nomes fora da ordem de criação: dentro do mesmo status, a ordem só pode vir do id.
+    const zeca = await createUser({ companyId: company.id, name: "Zeca", isActive: false });
+    const bia = await createUser({ companyId: company.id, name: "Bia" });
+    const ana = await createUser({ companyId: company.id, name: "Ana", isActive: false });
+    const blockedIds = [zeca, ana].map((user) => user.id).toSorted();
+    const activeIds = [admin, bia].map((user) => user.id).toSorted();
+    const cookies = sessionCookiesFor(admin.id);
+
+    const cases = [
+      { order: "asc", expected: [...blockedIds, ...activeIds], statuses: [false, false, true, true] },
+      {
+        order: "desc",
+        expected: [...activeIds.toReversed(), ...blockedIds.toReversed()],
+        statuses: [true, true, false, false],
+      },
+    ] as const;
+
+    for (const { order, expected, statuses } of cases) {
+      const response = await app.inject({
+        method: "GET",
+        url: `${USERS_URL}?orderBy=isActive&order=${order}`,
+        cookies,
+      });
+      const users = response.json().users as { id: string; isActive: boolean }[];
+
+      expect(response.statusCode).toBe(200);
+      expect(users.map((user) => user.id)).toEqual(expected);
+      expect(users.map((user) => user.isActive)).toEqual(statuses);
+
+      const secondPage = await app.inject({
+        method: "GET",
+        url: `${USERS_URL}?orderBy=isActive&order=${order}&page=1&pageSize=2`,
+        cookies,
+      });
+
+      expect(secondPage.json().count).toBe(4);
+      expect(secondPage.json().users.map((user: { id: string }) => user.id)).toEqual(expected.slice(2));
+    }
+  });
+
   it("campo de ordenação fora da allowlist responde 400", async () => {
     const { admin } = await seedCompanyWithUsers();
 

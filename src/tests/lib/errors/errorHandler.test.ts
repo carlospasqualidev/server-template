@@ -1,8 +1,49 @@
+import Fastify from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { type App, buildApp } from "@/app";
-import { BadRequestError } from "@/lib/errors";
+import { loadEnv } from "@/config/env";
+import { buildLoggerOptions } from "@/config/logger";
+import { BadRequestError, errorHandler } from "@/lib/errors";
+
+interface LogLine {
+  msg?: string;
+  err?: Record<string, unknown>;
+}
+
+/**
+ * App com o logger de produção (a suíte desliga o log) escrevendo numa lista em memória e o `errorHandler` nos erros
+ * do roteador e das rotas, para ler o que ele grava.
+ */
+async function createLoggedApp() {
+  const logger = buildLoggerOptions(
+    loadEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://localhost:5432/error-handler-test",
+      JWT_SECRET: "error-handler-test-secret-16",
+    }),
+  );
+
+  if (typeof logger !== "object") {
+    throw new Error("O logger de produção precisa estar ligado.");
+  }
+
+  const output: string[] = [];
+  const app = Fastify({
+    logger: { ...logger, stream: { write: (line: string) => output.push(line) } },
+    frameworkErrors: errorHandler,
+  });
+  app.setErrorHandler(errorHandler);
+  app.get("/api/items/:itemId", async () => ({ ok: true }));
+  // Valor lançado que não é `Error`: só o `statusCode`, sem `message` nem `stack`.
+  app.get("/api/plain-error", async () => {
+    throw { statusCode: 400 };
+  });
+  await app.ready();
+
+  return { app, output, lines: () => output.map((line) => JSON.parse(line) as LogLine) };
+}
 
 /** Rotas de apoio que lançam cada tipo de erro, para exercitar o `errorHandler` de ponta a ponta. */
 async function registerErrorRoutes(app: App): Promise<void> {
@@ -122,5 +163,62 @@ describe("errorHandler", () => {
       expect(response.body).not.toContain("%E0");
       expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGIN);
     });
+
+    it("URL malformada com busca: o log leva a mensagem do roteador com a busca mascarada, e a resposta não muda", async () => {
+      const logged = await createLoggedApp();
+
+      try {
+        const response = await logged.app.inject({ method: "GET", url: "/api/%E0?search=maria&page=0" });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json()).toEqual({ message: "URL inválida." });
+
+        const warning = logged.lines().find((line) => line.msg === "URL inválida.");
+        expect(warning?.err).toMatchObject({
+          type: "FastifyError",
+          code: "FST_ERR_BAD_URL",
+          statusCode: 400,
+          message: "'/api/%E0?search=[omitido]&page=0' is not a valid url component",
+        });
+        expect(warning?.err?.stack).toContain("'/api/%E0?search=[omitido]&page=0' is not a valid url component");
+        expect(logged.output.join("")).not.toContain("maria");
+      } finally {
+        await logged.app.close();
+      }
+    });
+
+    it("URL malformada sem busca: o erro vai ao log como o roteador o criou", async () => {
+      const logged = await createLoggedApp();
+
+      try {
+        await logged.app.inject({ method: "GET", url: "/api/%E0?page=0" });
+
+        const warning = logged.lines().find((line) => line.msg === "URL inválida.");
+        expect(warning?.err).toMatchObject({
+          type: "FastifyError",
+          code: "FST_ERR_BAD_URL",
+          message: "'/api/%E0?page=0' is not a valid url component",
+        });
+      } finally {
+        await logged.app.close();
+      }
+    });
+  });
+
+  it("valor lançado que não é `Error`, com `statusCode` 4xx e sem `message`, numa URL com busca: resposta no formato do projeto e log sem o termo", async () => {
+    const logged = await createLoggedApp();
+
+    try {
+      const response = await logged.app.inject({ method: "GET", url: "/api/plain-error?search=maria&page=0" });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: "Requisição inválida." });
+
+      const warning = logged.lines().find((line) => line.msg === "Requisição inválida.");
+      expect(warning?.err).toEqual({ statusCode: 400 });
+      expect(logged.output.join("")).not.toContain("maria");
+    } finally {
+      await logged.app.close();
+    }
   });
 });

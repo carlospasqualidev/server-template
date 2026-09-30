@@ -1,8 +1,10 @@
 import { env } from "@/config/env";
+import { maskSearchInUrl } from "@/config/logger";
 
 interface ErrorContext {
   requestId: string;
   method: string;
+  /** Sai com a busca (`search`) mascarada, como no log de requisição. */
   url: string;
   /** ID opaco do usuário autenticado. Nunca envie nome, e-mail ou outro dado pessoal. */
   userId?: string;
@@ -28,7 +30,7 @@ export async function reportError(error: unknown, context: ErrorContext): Promis
         environment: env.PROJECT_ENVIRONMENT,
         side: "Server",
         errorStack,
-        extraInfo: context,
+        extraInfo: { ...context, url: maskSearchInUrl(context.url) },
       }),
     });
   } catch {

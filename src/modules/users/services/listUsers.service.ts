@@ -11,7 +11,7 @@ interface ListUsersInput {
 
 /**
  * Ordenação da lista. Em `lastLoginAt`, quem nunca acessou (null) fica no fim nos dois sentidos. O id (uuid v7) desempata:
- * a paginação fica estável entre usuários com o mesmo valor (vários que nunca acessaram, nomes iguais).
+ * a paginação fica estável entre usuários com o mesmo valor (vários que nunca acessaram, nomes iguais, o mesmo status).
  */
 function toUsersOrderBy({ orderBy, order }: ListUsersQuery): Prisma.UserOrderByWithRelationInput[] {
   const primary: Prisma.UserOrderByWithRelationInput =
