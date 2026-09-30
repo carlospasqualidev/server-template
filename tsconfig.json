@@ -22,7 +22,5 @@
     "noEmit": true
   },
   "include": ["src", "prisma", "scripts", "prisma.config.ts", "vitest.config.ts"],
-  // src/api, lib e prisma/seeds sao a estrutura antiga (substituida por src/modules, src/lib e prisma/seed.ts).
-  // Apague essas pastas e remova-as daqui.
-  "exclude": ["node_modules", "dist", "src/api", "prisma/seeds"]
+  "exclude": ["node_modules", "dist"]
 }

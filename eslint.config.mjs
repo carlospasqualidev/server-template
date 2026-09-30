@@ -10,8 +10,7 @@ import tseslint from "typescript-eslint";
 const RELATIVE_IMPORT_MESSAGE = "Importe pelo alias `@/` (ex.: `@/lib/errors`), nunca por caminho relativo.";
 
 export default defineConfig(
-  // src/api, lib e prisma/seeds sao a estrutura antiga. Apague-as e remova daqui.
-  globalIgnores(["dist/**", "coverage/**", "src/generated/**", "docs/**", "src/api/**", "lib/**", "prisma/seeds/**"]),
+  globalIgnores(["dist/**", "coverage/**", "src/generated/**", "docs/**"]),
   eslint.configs.recommended,
   tseslint.configs.strict,
   tseslint.configs.stylistic,

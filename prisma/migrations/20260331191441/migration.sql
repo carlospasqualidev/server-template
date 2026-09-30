@@ -1,1 +1,0 @@
--- Migration da estrutura antiga, esvaziada. Apague esta pasta (20260331191441) junto com src/api, lib e prisma/seeds.
