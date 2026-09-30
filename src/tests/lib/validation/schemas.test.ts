@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cepSchema, cnpjSchema, cpfSchema, emailSchema, phoneSchema } from "@/lib/validation/schemas";
+import { cepSchema, cnpjSchema, cpfSchema, emailSchema, imageUrlSchema, phoneSchema } from "@/lib/validation/schemas";
 
 describe("emailSchema", () => {
   it("normaliza espaços e maiúsculas antes de validar", () => {
@@ -40,5 +40,36 @@ describe("documentos brasileiros", () => {
     expect(cepSchema.safeParse("88000-000").success).toBe(true);
     expect(cepSchema.safeParse("88000000").success).toBe(true);
     expect(cepSchema.safeParse("8800-000").success).toBe(false);
+  });
+});
+
+describe("imageUrlSchema", () => {
+  const HTTPS_PREFIX = "https://cdn.example.com/";
+
+  it("aceita a URL https do upload, até 2048 caracteres", () => {
+    expect(imageUrlSchema.safeParse("https://bucket.s3.sa-east-1.amazonaws.com/uploads/foto.png").success).toBe(true);
+    expect(imageUrlSchema.safeParse(`${HTTPS_PREFIX}${"a".repeat(2048 - HTTPS_PREFIX.length)}`).success).toBe(true);
+  });
+
+  it.each([
+    "javascript:alert(1)",
+    "data:image/png;base64,iVBORw0KGgo=",
+    "http://cdn.example.com/foto.png",
+    "ftp://cdn.example.com/foto.png",
+    "nao-e-url",
+  ])("recusa %s com mensagem em pt-BR", (value) => {
+    const result = imageUrlSchema.safeParse(value);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual(["A imagem deve ser uma URL https válida."]);
+  });
+
+  it("recusa acima de 2048 caracteres sem analisar a URL", () => {
+    const result = imageUrlSchema.safeParse(`${HTTPS_PREFIX}${"a".repeat(2049 - HTTPS_PREFIX.length)}`);
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      "A URL da imagem deve ter no máximo 2048 caracteres.",
+    ]);
   });
 });

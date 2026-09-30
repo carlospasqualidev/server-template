@@ -1,6 +1,6 @@
 import { type Prisma } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
-import { assertExists, BadRequestError } from "@/lib/errors";
+import { assertExists, BadRequestError, ConflictError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
 import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { type AuditEntry, recordAuditService } from "@/modules/audit/services/recordAudit.service";
@@ -15,6 +15,12 @@ interface UpdateUserInput {
   companyId: string;
   userId: string;
   data: UpdateUserBody;
+  /**
+   * Troca da própria senha: o hash que foi conferido com a senha atual, fora da transação (bcrypt não segura a trava).
+   * Se, com a linha já travada, o hash gravado for outro, a senha mudou no meio (outra troca, um administrador) e a
+   * edição responde 409 em vez de sobrescrevê-la.
+   */
+  expectedPasswordHash?: string;
 }
 
 type UserRow = Prisma.UserGetPayload<{ select: typeof userSelect }>;
@@ -65,7 +71,7 @@ function toUserChangeAuditEntries({ companyId, before, after, passwordChanged }:
   return entries;
 }
 
-export async function updateUserService({ companyId, userId, data }: UpdateUserInput) {
+export async function updateUserService({ companyId, userId, data, expectedPasswordHash }: UpdateUserInput) {
   await findUserByIdService({ companyId, userId });
 
   // Hash calculado antes da transação: a trava dos administradores não espera o bcrypt.
@@ -93,6 +99,17 @@ export async function updateUserService({ companyId, userId, data }: UpdateUserI
     const before = await tx.user.findFirst({ where: { id: userId, companyId, ...notDeleted }, select: userSelect });
 
     assertExists(before, "Usuário");
+
+    if (expectedPasswordHash !== undefined) {
+      const { password: currentPasswordHash } = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { password: true },
+      });
+
+      if (currentPasswordHash !== expectedPasswordHash) {
+        throw new ConflictError("A senha foi alterada enquanto você fazia a troca. Tente novamente com a senha atual.");
+      }
+    }
 
     const user = await tx.user.update({ where: { id: userId }, data: updateData, select: userCrudSelect(companyId) });
 

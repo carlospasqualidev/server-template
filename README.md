@@ -9,7 +9,7 @@ As convenções para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](
 - Node 22+ (ESM), TypeScript strict
 - Fastify 5 com `fastify-type-provider-zod`: um schema Zod por endpoint gera validação, tipos, serialização e OpenAPI
 - Prisma 7 sobre PostgreSQL (driver adapter `pg`)
-- Sessão: JWT em cookie HTTP-only (`token`), bcrypt para senha, rate limit no login
+- Sessão: JWT em cookie HTTP-only (`token`), bcrypt para senha, rate limit no login e na troca da própria senha
 - Upload: streaming para AWS S3 (`@aws-sdk/lib-storage`)
 - Logs: pino (pretty em dev, JSON em produção)
 - Testes: Vitest + `app.inject()` contra o banco `server_template_test`
@@ -92,7 +92,10 @@ Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm per
 | `POST`   | `/session/register`                      | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                                                     |
 | `POST`   | `/session/logout`                        | não       |                                                       | Limpa o cookie                                                                                                     |
 | `GET`    | `/users/me`                              | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                                                        |
-| `GET`    | `/users`                                 | sim       | `backoffice.users.read`                               | Lista paginada com cargos e último acesso (`page`, `pageSize`, `orderBy`, `order`, `search`, `isActive`, `roleId`) |
+| `GET`    | `/users/me/profile`                      | sim       |                                                       | Perfil gravado do próprio usuário (tempo de inatividade próprio, não o resolvido)                                  |
+| `PATCH`  | `/users/me`                              | sim       |                                                       | Edita o próprio perfil (nome, telefone, foto, tempo de inatividade)                                                |
+| `PUT`    | `/users/me/password`                     | sim       |                                                       | Troca a própria senha, com a senha atual (mesmo limite de tentativas do login)                                     |
+| `GET`    | `/users`                                 | sim       | `backoffice.users.read`                               | Lista paginada com cargos e o último acesso (filtros: `search`, `isActive`, `roleId`, `createdFrom` e `createdTo`) |
 | `GET`    | `/users/:userId`                         | sim       | `backoffice.users.read`                               | Busca por id (mesma empresa), com cargos e último acesso                                                           |
 | `POST`   | `/users`                                 | sim       | `backoffice.users.create`                             | Cria usuário na empresa                                                                                            |
 | `PATCH`  | `/users/:userId`                         | sim       | `backoffice.users.update`                             | Atualização parcial                                                                                                |
@@ -125,11 +128,13 @@ Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do ca
 
 ## Sessão e timeout de inatividade
 
-Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie vale até `SESSION_TTL_HOURS`).
+Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar; o próprio usuário, em `PATCH /users/me`, só até o da empresa), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie vale até `SESSION_TTL_HOURS`).
 
 ## Usuários
 
-O usuário do CRUD (`/users`) traz, além do cadastro, os cargos que valem (`roles: [{ id, name }]`, por nome) e o último acesso (`lastLoginAt`, `null` para quem nunca acessou), gravado a cada abertura de sessão (login bem-sucedido ou register) junto do registro de auditoria, sem mexer no `updatedAt`, que reflete só edição de cadastro. Não há campo de status: ativo ou bloqueado é `isActive`. A lista filtra por cargo (`roleId=<id>,<id>`, qualquer um deles) e ordena por último acesso com quem nunca acessou no fim. Contrato completo: [`CLAUDE.md`](CLAUDE.md#contrato-com-os-clientes-frontend-web-e-app).
+O usuário do CRUD (`/users`) traz, além do cadastro, os cargos que valem (`roles: [{ id, name }]`, por nome) e o último acesso (`lastLoginAt`, `null` para quem nunca acessou), gravado a cada abertura de sessão (login bem-sucedido ou register) junto do registro de auditoria, sem mexer no `updatedAt`, que reflete só edição de cadastro. Não há campo de status: ativo ou bloqueado é `isActive`. A lista filtra por cargo (`roleId=<id>,<id>`, qualquer um deles) e por período de cadastro (`createdFrom`/`createdTo`, ISO 8601 UTC, inclusivos), e ordena por último acesso com quem nunca acessou no fim.
+
+Qualquer usuário logado, sem permissão de administrar usuários, lê o próprio perfil em `GET /users/me/profile` (os valores gravados: ali o tempo de inatividade é o próprio, `null` quando herda o da empresa, e não o resolvido da sessão), edita-o em `PATCH /users/me` (nome, telefone, foto `https` e tempo de inatividade até o da empresa; e-mail, status e cargos não mudam por aqui) e troca a própria senha em `PUT /users/me/password`, informando a senha atual (se a senha mudar por outro caminho no meio da troca, responde 409 e nada é gravado). As duas mudanças entram na trilha de auditoria com o próprio usuário como autor (a senha só como campo alterado, sem valor). A troca de senha não encerra as sessões abertas: sem tabela de sessões, o cookie já emitido vale até expirar (`SESSION_TTL_HOURS`). Contrato completo: [`CLAUDE.md`](CLAUDE.md#contrato-com-os-clientes-frontend-web-e-app).
 
 ## Configurações de sistema
 

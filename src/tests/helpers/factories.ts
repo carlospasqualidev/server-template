@@ -93,6 +93,8 @@ interface UserOverrides {
   idleTimeoutMinutes?: number | null;
   /** Último login; ausente ou null = nunca acessou. */
   lastLoginAt?: Date | null;
+  /** Data do cadastro; ausente = agora. */
+  createdAt?: Date;
   deletedAt?: Date | null;
   /**
    * Ausente: o usuário recebe o cargo `Administrador` da empresa (catálogo inteiro). `[]`: sem cargo. Lista: um cargo
@@ -136,6 +138,7 @@ export async function createUser(overrides: UserOverrides = {}) {
       isActive: overrides.isActive ?? true,
       idleTimeoutMinutes: overrides.idleTimeoutMinutes ?? null,
       lastLoginAt: overrides.lastLoginAt ?? null,
+      ...(overrides.createdAt && { createdAt: overrides.createdAt }),
       deletedAt: overrides.deletedAt ?? null,
       userRoles: { createMany: { data: roleIds.map((roleId) => ({ roleId })) } },
     },

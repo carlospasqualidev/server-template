@@ -81,7 +81,49 @@ describe("PATCH /api/client/users/:userId", () => {
     expect(response.json().user).toMatchObject({ phone: null, image: null });
   });
 
+  it.each([
+    { label: "javascript:", image: "javascript:alert(1)", message: "A imagem deve ser uma URL https válida." },
+    { label: "data:", image: "data:image/png;base64,iVBORw0KGgo=", message: "A imagem deve ser uma URL https válida." },
+    { label: "http:", image: "http://cdn.example.com/foto.png", message: "A imagem deve ser uma URL https válida." },
+    {
+      label: "acima de 2048 caracteres",
+      image: `https://cdn.example.com/${"a".repeat(2048)}.png`,
+      message: "A URL da imagem deve ter no máximo 2048 caracteres.",
+    },
+  ])("foto $label responde 400 e mantém a foto", async ({ image, message }) => {
+    const admin = await createUser();
+    const target = await createUser({ companyId: admin.companyId, image: "https://cdn.example.com/atual.png" });
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: `${USERS_URL}/${target.id}`,
+      cookies: sessionCookiesFor(admin.id),
+      payload: { image },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues).toEqual([{ path: "image", message }]);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: target.id } })).image).toBe(
+      "https://cdn.example.com/atual.png",
+    );
+  });
+
   describe("tempo de inatividade próprio (idleTimeoutMinutes)", () => {
+    it("o administrador grava acima do limite da empresa (o autoatendimento recusaria), até 480", async () => {
+      const admin = await createUser();
+      const target = await createUser({ companyId: admin.companyId });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/${target.id}`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { idleTimeoutMinutes: 480 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().user.idleTimeoutMinutes).toBe(480);
+    });
+
     it("define o tempo e o usuário passa a recebê-lo na sessão", async () => {
       const admin = await createUser();
       const target = await createUser({ companyId: admin.companyId });

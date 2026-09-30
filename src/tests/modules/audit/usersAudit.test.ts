@@ -4,7 +4,7 @@ import { type App } from "@/app";
 import { AUDIT_USER_AGENT_MAX_LENGTH } from "@/config/constants";
 import { prisma } from "@/lib/prisma";
 import { createTestApp } from "@/tests/helpers/app";
-import { createRole, createUser, findAdminRole, findAuditLogs } from "@/tests/helpers/factories";
+import { createRole, createUser, DEFAULT_PASSWORD, findAdminRole, findAuditLogs } from "@/tests/helpers/factories";
 import { sessionCookiesFor } from "@/tests/helpers/session";
 
 const USERS_URL = "/api/client/users";
@@ -323,6 +323,124 @@ describe("trilha de auditoria: usuários", () => {
 
       expect(response.statusCode).toBe(400);
       expect(await findAuditLogs(admin.companyId)).toEqual([]);
+    });
+  });
+
+  describe("PATCH /users/me", () => {
+    it("edição do próprio perfil registra antes e depois com os valores, o nome atual e o próprio usuário como autor", async () => {
+      const user = await createUser({ name: "Nome Antigo", email: "eu@example.com", permissions: [] });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/me`,
+        cookies: sessionCookiesFor(user.id),
+        payload: {
+          name: "Nome Novo",
+          phone: "48999999999",
+          image: "https://cdn.example.com/eu.png",
+          idleTimeoutMinutes: 15,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(await findAuditLogs(user.companyId)).toEqual([
+        expect.objectContaining({
+          module: "USERS",
+          entity: "User",
+          entityId: user.id,
+          action: "update",
+          description: 'Editou o usuário "Nome Novo".',
+          before: { name: "Nome Antigo", email: "eu@example.com", image: null, phone: null, idleTimeoutMinutes: null },
+          after: {
+            name: "Nome Novo",
+            email: "eu@example.com",
+            image: "https://cdn.example.com/eu.png",
+            phone: "48999999999",
+            idleTimeoutMinutes: 15,
+          },
+          changedFields: ["name", "image", "phone", "idleTimeoutMinutes"],
+          userId: user.id,
+        }),
+      ]);
+    });
+
+    it("salvar sem mudar nada não grava registro", async () => {
+      const user = await createUser({ name: "Igual" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/me`,
+        cookies: sessionCookiesFor(user.id),
+        payload: { name: "Igual" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(await findAuditLogs(user.companyId)).toEqual([]);
+    });
+
+    it("campo fora do perfil responde 400 e não grava registro", async () => {
+      const user = await createUser();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `${USERS_URL}/me`,
+        cookies: sessionCookiesFor(user.id),
+        payload: { name: "Outro", isActive: false },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(await findAuditLogs(user.companyId)).toEqual([]);
+    });
+  });
+
+  describe("PUT /users/me/password", () => {
+    it("troca da própria senha registra `password` só como campo alterado, sem valor nem hash", async () => {
+      const user = await createUser({ name: "Lia", email: "lia@example.com", permissions: [] });
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `${USERS_URL}/me/password`,
+        cookies: sessionCookiesFor(user.id),
+        payload: { currentPassword: DEFAULT_PASSWORD, password: "nova-senha-1", confirmPassword: "nova-senha-1" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const logs = await findAuditLogs(user.companyId);
+      const updated = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+      const unchanged = { name: "Lia", email: "lia@example.com", image: null, phone: null, idleTimeoutMinutes: null };
+
+      expect(logs).toEqual([
+        expect.objectContaining({
+          module: "USERS",
+          entity: "User",
+          entityId: user.id,
+          action: "update",
+          description: 'Editou o usuário "Lia".',
+          before: unchanged,
+          after: unchanged,
+          changedFields: ["password"],
+          userId: user.id,
+        }),
+      ]);
+      const serialized = JSON.stringify(logs);
+      expect(serialized).not.toContain("nova-senha-1");
+      expect(serialized).not.toContain(DEFAULT_PASSWORD);
+      expect(serialized).not.toContain(updated.password);
+      expect(serialized).not.toContain(user.password);
+    });
+
+    it("senha atual errada responde 400 e não grava registro", async () => {
+      const user = await createUser();
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `${USERS_URL}/me/password`,
+        cookies: sessionCookiesFor(user.id),
+        payload: { currentPassword: "senha-errada-1", password: "nova-senha-1", confirmPassword: "nova-senha-1" },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(await findAuditLogs(user.companyId)).toEqual([]);
     });
   });
 

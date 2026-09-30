@@ -217,6 +217,109 @@ describe("GET /api/client/users", () => {
     });
   });
 
+  describe("filtro por período de cadastro", () => {
+    async function seedUsersByCreatedAt() {
+      const company = await createCompany();
+      const admin = await createUser({
+        companyId: company.id,
+        name: "Admin",
+        createdAt: new Date("2026-01-10T12:00:00.000Z"),
+      });
+      const seeds = [
+        { name: "Agosto", createdAt: "2026-08-31T23:59:59.999Z" },
+        { name: "Início", createdAt: "2026-09-01T00:00:00.000Z" },
+        { name: "Meio", createdAt: "2026-09-15T10:30:00.000Z" },
+        { name: "Fim", createdAt: "2026-09-30T23:59:59.999Z" },
+        { name: "Outubro", createdAt: "2026-10-01T00:00:00.000Z" },
+      ];
+
+      for (const { name, createdAt } of seeds) {
+        await createUser({ companyId: company.id, name, createdAt: new Date(createdAt) });
+      }
+
+      await createUser({
+        companyId: company.id,
+        name: "Excluído",
+        createdAt: new Date("2026-09-10T00:00:00.000Z"),
+        deletedAt: new Date(),
+      });
+      // De outra empresa, cadastrado no período: nunca aparece.
+      await createUser({ name: "Intruso", createdAt: new Date("2026-09-10T00:00:00.000Z") });
+
+      return { admin };
+    }
+
+    async function listNames(cookies: Record<string, string>, filter: string) {
+      const response = await app.inject({
+        method: "GET",
+        url: `${USERS_URL}?orderBy=createdAt&order=asc&${filter}`,
+        cookies,
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      return {
+        count: response.json().count as number,
+        names: response.json().users.map((user: { name: string }) => user.name) as string[],
+      };
+    }
+
+    it("inclui as duas bordas e deixa de fora quem foi cadastrado antes ou depois", async () => {
+      const { admin } = await seedUsersByCreatedAt();
+
+      expect(
+        await listNames(
+          sessionCookiesFor(admin.id),
+          "createdFrom=2026-09-01T00:00:00.000Z&createdTo=2026-09-30T23:59:59.999Z",
+        ),
+      ).toEqual({ count: 3, names: ["Início", "Meio", "Fim"] });
+    });
+
+    it("cada ponta sozinha também filtra, e o total acompanha o filtro", async () => {
+      const { admin } = await seedUsersByCreatedAt();
+      const cookies = sessionCookiesFor(admin.id);
+
+      expect(await listNames(cookies, "createdFrom=2026-09-15T10:30:00.000Z")).toEqual({
+        count: 3,
+        names: ["Meio", "Fim", "Outubro"],
+      });
+      expect(await listNames(cookies, "createdTo=2026-09-01T00:00:00.000Z")).toEqual({
+        count: 3,
+        names: ["Admin", "Agosto", "Início"],
+      });
+      expect(await listNames(cookies, "createdFrom=2026-09-01T00:00:00.000Z&pageSize=1")).toEqual({
+        count: 4,
+        names: ["Início"],
+      });
+    });
+
+    it("combina com os outros filtros", async () => {
+      const { admin } = await seedUsersByCreatedAt();
+
+      expect(
+        await listNames(
+          sessionCookiesFor(admin.id),
+          "createdFrom=2026-09-01T00:00:00.000Z&createdTo=2026-09-30T23:59:59.999Z&search=mei",
+        ),
+      ).toEqual({ count: 1, names: ["Meio"] });
+    });
+
+    it("data fora do ISO 8601 UTC responde 400", async () => {
+      const { admin } = await seedUsersByCreatedAt();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `${USERS_URL}?createdFrom=2026-09-01`,
+        cookies: sessionCookiesFor(admin.id),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().issues).toEqual([
+        { path: "createdFrom", message: "Data e hora inválidas. Use ISO 8601 em UTC." },
+      ]);
+    });
+  });
+
   it("ordena por último acesso com quem nunca acessou no fim, nos dois sentidos", async () => {
     const company = await createCompany();
     const admin = await createUser({ companyId: company.id, name: "Admin" });

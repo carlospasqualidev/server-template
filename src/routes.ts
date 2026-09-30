@@ -6,9 +6,9 @@ import { rolesRoutes } from "@/modules/roles/roles.routes";
 import { type SessionRoutesOptions, sessionRoutes } from "@/modules/session/session.routes";
 import { systemConfigsRoutes } from "@/modules/systemConfigs/systemConfigs.routes";
 import { uploadRoutes } from "@/modules/upload/upload.routes";
-import { usersRoutes } from "@/modules/users/users.routes";
+import { type UsersRoutesOptions, usersRoutes } from "@/modules/users/users.routes";
 
-export type ApiRoutesOptions = SessionRoutesOptions;
+export type ApiRoutesOptions = SessionRoutesOptions & UsersRoutesOptions;
 
 /**
  * Árvore de rotas da API (`/api`). O grupo `/client` é o consumidor atual (frontend web).
@@ -27,7 +27,7 @@ const clientRoutes: FastifyPluginAsyncZod<ApiRoutesOptions> = async (app, option
   app.register(async (protectedRoutes) => {
     protectedRoutes.addHook("onRequest", requireSession);
 
-    protectedRoutes.register(usersRoutes, { prefix: "/users" });
+    protectedRoutes.register(usersRoutes, { prefix: "/users", loginRateLimitMax: options.loginRateLimitMax });
     protectedRoutes.register(rolesRoutes, { prefix: "/roles" });
     protectedRoutes.register(systemConfigsRoutes, { prefix: "/system-configs" });
     protectedRoutes.register(auditRoutes, { prefix: "/audit-logs" });

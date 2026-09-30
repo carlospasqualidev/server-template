@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { PASSWORD_MIN_LENGTH } from "@/config/constants";
+import { MAX_IMAGE_URL_LENGTH, PASSWORD_MIN_LENGTH } from "@/config/constants";
 
 /** Primitivos reutilizáveis com mensagem em pt-BR. Componha-os nos schemas dos módulos. */
 
@@ -47,6 +47,16 @@ export const cepSchema = z
   .regex(/^\d{5}-?\d{3}$/, "O CEP deve possuir o formato 00000-000.");
 
 export const urlSchema = z.url({ message: "URL inválida." });
+
+/**
+ * URL de imagem gravada numa entidade (a foto do usuário, o `Location` do upload). Só `https:`: `urlSchema` aceita
+ * também `javascript:`, `data:` e `http:`, que o cliente renderizaria. O tamanho é conferido antes da análise da URL.
+ */
+export const imageUrlSchema = z
+  .string({ message: "A imagem deve ser uma URL https válida." })
+  .max(MAX_IMAGE_URL_LENGTH, `A URL da imagem deve ter no máximo ${MAX_IMAGE_URL_LENGTH} caracteres.`)
+  .pipe(z.url({ protocol: /^https$/, message: "A imagem deve ser uma URL https válida." }))
+  .meta({ format: "uri" });
 
 /** Data sem hora, `AAAA-MM-DD`. */
 export const dateOnlySchema = z.iso.date({ message: "Data inválida. Use o formato AAAA-MM-DD." });

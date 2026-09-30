@@ -114,6 +114,36 @@ describe("POST /api/client/users", () => {
     expect(response.json().issues[0].path).toBe("phone");
   });
 
+  it.each([
+    { label: "javascript:", image: "javascript:alert(1)", message: "A imagem deve ser uma URL https válida." },
+    { label: "data:", image: "data:image/png;base64,iVBORw0KGgo=", message: "A imagem deve ser uma URL https válida." },
+    { label: "http:", image: "http://cdn.example.com/foto.png", message: "A imagem deve ser uma URL https válida." },
+    {
+      label: "acima de 2048 caracteres",
+      image: `https://cdn.example.com/${"a".repeat(2048)}.png`,
+      message: "A URL da imagem deve ter no máximo 2048 caracteres.",
+    },
+  ])("foto $label responde 400 e não cria", async ({ image, message }) => {
+    const admin = await createUser();
+
+    const response = await app.inject({
+      method: "POST",
+      url: USERS_URL,
+      cookies: sessionCookiesFor(admin.id),
+      payload: {
+        name: "Fulano",
+        email: "foto@example.com",
+        password: "senha-forte-1",
+        confirmPassword: "senha-forte-1",
+        image,
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues).toEqual([{ path: "image", message }]);
+    expect(await prisma.user.count({ where: { email: "foto@example.com" } })).toBe(0);
+  });
+
   describe("tempo de inatividade próprio (idleTimeoutMinutes)", () => {
     const newUserPayload = {
       name: "Fulano",

@@ -3,12 +3,12 @@ import { z } from "zod";
 import { errorResponseSchema } from "@/lib/http/responses";
 import {
   emailSchema,
+  imageUrlSchema,
   nameSchema,
   passwordSchema,
   passwordsMatch,
   passwordsMatchIssue,
   phoneSchema,
-  urlSchema,
 } from "@/lib/validation/schemas";
 import { idleTimeoutMinutesBodySchema, userSchema } from "@/modules/users/schemas/user.schemas";
 
@@ -19,7 +19,7 @@ export const createUserBodySchema = z
     password: passwordSchema.describe("Senha."),
     confirmPassword: z.string({ message: "Confirme a senha." }).describe("Confirmação da senha."),
     phone: phoneSchema.nullish().describe("Telefone."),
-    image: urlSchema.nullish().describe("URL da foto (use a rota de upload antes)."),
+    image: imageUrlSchema.nullish().describe("URL https da foto (use a rota de upload antes)."),
     idleTimeoutMinutes: idleTimeoutMinutesBodySchema
       .optional()
       .describe("Tempo de inatividade próprio, em minutos (1 a 480). Ausente ou null: herda o da empresa."),

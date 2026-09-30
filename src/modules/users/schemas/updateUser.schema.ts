@@ -2,12 +2,12 @@ import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
 import {
+  imageUrlSchema,
   nameSchema,
   passwordSchema,
   passwordsMatch,
   passwordsMatchIssue,
   phoneSchema,
-  urlSchema,
 } from "@/lib/validation/schemas";
 import { idleTimeoutMinutesBodySchema, userParamsSchema, userSchema } from "@/modules/users/schemas/user.schemas";
 
@@ -16,7 +16,7 @@ export const updateUserBodySchema = z
   .object({
     name: nameSchema.optional().describe("Nome."),
     phone: phoneSchema.nullable().optional().describe("Telefone (null limpa)."),
-    image: urlSchema.nullable().optional().describe("URL da foto (null limpa)."),
+    image: imageUrlSchema.nullable().optional().describe("URL https da foto (null limpa)."),
     isActive: z.boolean().optional().describe("false bloqueia o acesso."),
     idleTimeoutMinutes: idleTimeoutMinutesBodySchema
       .optional()

@@ -710,7 +710,7 @@
         "tags": [
           "Users"
         ],
-        "description": "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos) e filtros. Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
+        "description": "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos) e filtros, inclusive o período de cadastro (`createdFrom`/`createdTo`, inclusivos). Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
         "parameters": [
           {
             "schema": {
@@ -797,6 +797,28 @@
             "name": "roleId",
             "required": false,
             "description": "Cargos (ids), separados por vírgula: usuários com qualquer um deles."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "createdFrom",
+            "required": false,
+            "description": "Cadastrados a partir de (inclusivo), ISO 8601 em UTC."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "createdTo",
+            "required": false,
+            "description": "Cadastrados até (inclusivo), ISO 8601 em UTC."
           }
         ],
         "security": [
@@ -1114,11 +1136,12 @@
                     ]
                   },
                   "image": {
-                    "description": "URL da foto (use a rota de upload antes).",
+                    "description": "URL https da foto (use a rota de upload antes).",
                     "anyOf": [
                       {
+                        "format": "uri",
                         "type": "string",
-                        "format": "uri"
+                        "maxLength": 2048
                       },
                       {
                         "type": "null"
@@ -1621,6 +1644,726 @@
             }
           }
         }
+      },
+      "patch": {
+        "summary": "Atualiza o próprio perfil",
+        "tags": [
+          "Users"
+        ],
+        "description": "Só exige sessão: qualquer usuário autenticado edita o próprio nome, telefone, foto e tempo de inatividade. Não aceita `email`, `isActive`, cargos nem senha (campo fora da lista responde 400). O tempo de inatividade vai no máximo até o da empresa (`security.idleTimeoutMinutes`); acima dele responde 400 com o limite na mensagem. Devolve o usuário no formato da sessão (o mesmo de `GET /users/me`), com as permissões e o `idleTimeoutMinutes` já resolvido.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "description": "Nome.",
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "phone": {
+                    "description": "Telefone (null limpa).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\(?\\d{2}\\)? ?\\d{4,5}-?\\d{4}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "image": {
+                    "description": "URL https da foto, o `Location` devolvido por `POST /upload/file` (null remove).",
+                    "anyOf": [
+                      {
+                        "format": "uri",
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idleTimeoutMinutes": {
+                    "description": "Tempo de inatividade próprio, em minutos: de 1 até o da empresa (`security.idleTimeoutMinutes`). null volta a herdar o da empresa.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 480
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "Identificador do usuário."
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "Nome."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "E-mail."
+                        },
+                        "image": {
+                          "description": "URL da foto, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "permissions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Permissões efetivas (união dos cargos do usuário), em ordem alfabética. O frontend decide menu e botões por `includes`; o backend é quem autoriza.",
+                          "example": [
+                            "backoffice.users.create",
+                            "backoffice.users.read"
+                          ]
+                        },
+                        "idleTimeoutMinutes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Minutos sem atividade até o logout automático no cliente, já resolvidos: o do cadastro do usuário, senão o da empresa (`security.idleTimeoutMinutes`), senão 20. O servidor não impõe: a sessão vale até expirar.",
+                          "example": 20
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "email",
+                        "image",
+                        "permissions",
+                        "idleTimeoutMinutes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "user"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/users/me/profile": {
+      "get": {
+        "summary": "Perfil do próprio usuário",
+        "tags": [
+          "Users"
+        ],
+        "description": "Só exige sessão. Devolve o que `PATCH /users/me` edita, com os valores gravados, para pré-preencher o formulário de perfil. Aqui `idleTimeoutMinutes` é o próprio do usuário (`null` quando herda o da empresa); na sessão (`GET /users/me`) ele sai já resolvido.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Nome."
+                        },
+                        "email": {
+                          "type": "string",
+                          "description": "E-mail."
+                        },
+                        "phone": {
+                          "description": "Telefone, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "image": {
+                          "description": "URL da foto, ou null.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "idleTimeoutMinutes": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tempo de inatividade próprio do usuário, em minutos; null herda o da empresa. O valor que vale sai já resolvido na sessão."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "email",
+                        "phone",
+                        "image",
+                        "idleTimeoutMinutes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "profile"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/client/users/me/password": {
+      "put": {
+        "summary": "Troca a própria senha",
+        "tags": [
+          "Users"
+        ],
+        "description": "Só exige sessão. Confere a senha atual (errada responde 400 `Senha atual incorreta.`); a nova segue as regras de senha, precisa ser igual à confirmação e diferente da atual. Se a senha mudar por outro caminho entre a conferência e a gravação, responde 409 e mantém a que foi gravada. Mesmo limite de tentativas do login (429). As sessões abertas continuam válidas: o JWT não é revogado.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Senha atual, conferida antes da troca."
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 72,
+                    "description": "Nova senha."
+                  },
+                  "confirmPassword": {
+                    "type": "string",
+                    "description": "Confirmação da nova senha."
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "password",
+                  "confirmPassword"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Confirmação pronta para o usuário final."
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "description": "Mensagem pronta para o usuário final, em pt-BR."
+                    },
+                    "details": {
+                      "description": "Dado extra do erro, quando houver."
+                    },
+                    "issues": {
+                      "description": "Campos inválidos (erro de validação).",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path",
+                          "message"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/client/users/{userId}": {
@@ -1975,11 +2718,12 @@
                     ]
                   },
                   "image": {
-                    "description": "URL da foto (null limpa).",
+                    "description": "URL https da foto (null limpa).",
                     "anyOf": [
                       {
+                        "format": "uri",
                         "type": "string",
-                        "format": "uri"
+                        "maxLength": 2048
                       },
                       {
                         "type": "null"

@@ -15,6 +15,9 @@ export const MAX_BODY_IDS = 1000;
 
 export const MAX_UPLOAD_FILE_SIZE_IN_BYTES = 15 * 1024 * 1024;
 
+/** Tamanho máximo da URL de imagem gravada numa entidade (a foto do usuário); a URL do upload fica bem abaixo disso. */
+export const MAX_IMAGE_URL_LENGTH = 2048;
+
 /**
  * Faixa aceita para o tempo de inatividade até o logout, em minutos: no cadastro do usuário (`idleTimeoutMinutes`) e na
  * configuração da empresa (`security.idleTimeoutMinutes`). O padrão, quando nenhum dos dois está definido, fica no

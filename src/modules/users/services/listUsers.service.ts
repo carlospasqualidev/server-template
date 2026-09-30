@@ -20,7 +20,10 @@ function toUsersOrderBy({ orderBy, order }: ListUsersQuery): Prisma.UserOrderByW
   return [primary, { id: order }];
 }
 
-/** Listagem paginada de referência: escopo por tenant, exclusão lógica, busca, filtros e ordenação por allowlist. */
+/**
+ * Listagem paginada de referência: escopo por tenant, exclusão lógica, busca, filtros e ordenação por allowlist. O
+ * período de cadastro não tem índice próprio: filtra a lista já recortada pelo índice de `companyId`.
+ */
 export async function listUsersService({ companyId, query }: ListUsersInput) {
   const where: Prisma.UserWhereInput = {
     companyId,
@@ -28,6 +31,8 @@ export async function listUsersService({ companyId, query }: ListUsersInput) {
     ...(query.isActive !== undefined && { isActive: query.isActive }),
     // Só cargo que vale conta: id de cargo de outra empresa (ou excluído) no filtro não encontra ninguém.
     ...(query.roleId && { userRoles: { some: { roleId: { in: query.roleId }, ...currentRolesWhere(companyId) } } }),
+    // Período de cadastro, inclusivo nas duas pontas.
+    ...((query.createdFrom || query.createdTo) && { createdAt: { gte: query.createdFrom, lte: query.createdTo } }),
     ...(query.search && {
       OR: [
         { name: { contains: query.search, mode: "insensitive" } },
