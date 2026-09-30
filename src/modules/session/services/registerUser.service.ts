@@ -1,6 +1,7 @@
 import { hashPassword } from "@/lib/auth/password";
 import { ConflictError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { effectivePermissionsSelect, toPermissionNames } from "@/modules/permissions/permissions.select";
 import { createAdminRoleService } from "@/modules/permissions/services/createAdminRole.service";
@@ -62,7 +63,7 @@ export async function registerUserService({ name, email, password }: RegisterBod
         entity: "User",
         entityId: created.id,
         action: "create",
-        description: "Criou a própria conta",
+        description: AUDIT_DESCRIPTIONS.User.registered(created.name),
         after: created,
         userId: created.id,
       },

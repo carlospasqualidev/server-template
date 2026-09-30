@@ -157,23 +157,33 @@ enum AuditModule {
   SETTINGS
 }
 
-/// Acao registrada na trilha de auditoria. Rotulos pt-BR em `src/modules/audit/audit.catalog.ts`.
+/// Acao registrada na trilha de auditoria. Rotulos pt-BR em `src/modules/audit/audit.catalog.ts`. `export` e a
+/// retirada de dados por uma rota de exportacao (`recordExportAuditService`), com formato e filtros no `after`.
 enum AuditAction {
   create
   update
   delete
   statusChange
   login
+  export
 }
 
-/// Registro da trilha de auditoria: uma mudanca confirmada (ou um login) numa empresa, gravada na mesma transacao da
-/// mutacao por `recordAuditService`. So leitura pela API. `entity` e o nome do model afetado (`User`, `Role`,
-/// `SystemConfig`) e `entityId` o id dele, sem FK (polimorfico; a chave, no caso de configuracao). `before`/`after`
-/// guardam so valores primitivos, sem segredo e com dado pessoal substituido por um marcador. O nome do autor vem do
-/// relacionamento com `User`, nunca de copia aqui. `requestId`, `ip` e `userAgent` vem do contexto da requisicao e
-/// nao saem pela API. O indice `[companyId, createdAt]` tambem atende as consultas por `companyId`; o
-/// `[companyId, entity, entityId]` atende o historico de um registro (aba "Atividade": `entity` + `entityId`, sem
-/// `module`), sem depender de skip scan.
+/// Registro da trilha de auditoria: uma mudanca confirmada (ou um login, ou uma exportacao) numa empresa, gravada na
+/// mesma transacao da mutacao por `recordAuditService`. So leitura pela API. `entity` e o nome do model afetado
+/// (`User`, `Role`, `SystemConfig`) e `entityId` o id dele, sem FK (polimorfico; a chave, no caso de configuracao).
+/// `before`/`after` guardam so valores primitivos, com os dados pessoais (decisao do dono; prazo e anonimizacao na
+/// retencao) e nunca segredo; `description` nomeia o registro afetado. O nome do autor vem do relacionamento com
+/// `User`, nunca de copia aqui. `requestId`, `ip` e `userAgent` vem do contexto da requisicao e nao saem pela API.
+/// O indice `[companyId, createdAt]` tambem atende as consultas por `companyId`; o `[companyId, entity, entityId]`
+/// atende o historico de um registro (aba "Atividade": `entity` + `entityId`, sem `module`), sem depender de skip scan.
+///
+/// Busca por conteudo (`search` da lista, `ILIKE '%termo%'`): indices GIN trigram (`pg_trgm`) em `description` e
+/// `entityId` (modelados abaixo) e nos valores de `before`/`after`, pela expressao
+/// `(jsonb_path_query_array(<coluna>, '$.* ? (@ != null)')::text)`: so os valores do JSON, sem o nome das chaves nem
+/// os nulos (buscar "email" nao traz todo evento de usuario). Esses dois, `audit_logs_before_values_trgm_idx` e
+/// `audit_logs_after_values_trgm_idx`, existem so na migration `*_audit_logs_search_values`: o Prisma nao modela
+/// indice de expressao, e o `migrate dev` nao os enxerga nem tenta remove-los. Nao os declare aqui. A consulta
+/// (`listAuditLogsService`) repete a expressao igual; mudar uma exige mudar a outra, senao o indice deixa de ser usado.
 model AuditLog {
   id            String      @id @default(uuid(7))
   companyId     String
@@ -197,5 +207,7 @@ model AuditLog {
   @@index([companyId, createdAt])
   @@index([companyId, entity, entityId])
   @@index([userId])
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "audit_logs_description_trgm_idx")
+  @@index([entityId(ops: raw("gin_trgm_ops"))], type: Gin, map: "audit_logs_entityId_trgm_idx")
   @@map("audit_logs")
 }

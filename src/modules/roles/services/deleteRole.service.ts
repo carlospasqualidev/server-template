@@ -1,5 +1,6 @@
 import { BadRequestError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
 import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
@@ -45,7 +46,7 @@ export async function deleteRoleService({ companyId, roleId }: DeleteRoleInput):
         entity: "Role",
         entityId: roleId,
         action: "delete",
-        description: "Excluiu um cargo",
+        description: AUDIT_DESCRIPTIONS.Role.deleted(role.name),
         before: toRoleAuditSnapshot(role),
       },
       tx,

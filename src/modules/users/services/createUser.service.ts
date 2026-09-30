@@ -1,6 +1,7 @@
 import { hashPassword } from "@/lib/auth/password";
 import { ConflictError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { type CreateUserBody } from "@/modules/users/schemas/createUser.schema";
 import { toUserAuditState } from "@/modules/users/users.audit";
@@ -41,7 +42,7 @@ export async function createUserService({ companyId, data }: CreateUserInput) {
         entity: "User",
         entityId: user.id,
         action: "create",
-        description: "Cadastrou um usuário",
+        description: AUDIT_DESCRIPTIONS.User.created(user.name),
         after: toUserAuditState(user),
       },
       tx,

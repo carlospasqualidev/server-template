@@ -19,7 +19,7 @@ describe("trilha de auditoria: cargos", () => {
     await app.close();
   });
 
-  it("criar cargo registra nome, descrição e permissões (com o `read` implícito)", async () => {
+  it("criar cargo registra nome, descrição e permissões (com o `read` implícito) e o nome na descrição", async () => {
     const admin = await createUser();
 
     const response = await app.inject({
@@ -40,7 +40,7 @@ describe("trilha de auditoria: cargos", () => {
         entity: "Role",
         entityId: response.json().role.id,
         action: "create",
-        description: "Criou um cargo",
+        description: 'Criou o cargo "Suporte".',
         before: null,
         after: {
           name: "Suporte",
@@ -82,7 +82,7 @@ describe("trilha de auditoria: cargos", () => {
     expect(await findAuditLogs(actor.companyId)).toEqual([]);
   });
 
-  it("copiar cargo registra a criação da cópia", async () => {
+  it("copiar cargo registra a criação da cópia, com o nome do original e o da cópia na descrição", async () => {
     const admin = await createUser();
     const source = await createRole({
       companyId: admin.companyId,
@@ -102,7 +102,7 @@ describe("trilha de auditoria: cargos", () => {
         entity: "Role",
         entityId: response.json().role.id,
         action: "create",
-        description: "Copiou um cargo",
+        description: 'Copiou o cargo "Suporte" como "Suporte (cópia)".',
         after: { name: "Suporte (cópia)", description: null, permissions: "backoffice.users.read" },
         userId: admin.id,
       }),
@@ -127,7 +127,7 @@ describe("trilha de auditoria: cargos", () => {
     expect(await findAuditLogs(actor.companyId)).toEqual([]);
   });
 
-  it("editar cargo registra antes e depois com os campos alterados", async () => {
+  it("editar cargo registra antes e depois com os campos alterados e o nome atual na descrição", async () => {
     const admin = await createUser();
     const role = await createRole({
       companyId: admin.companyId,
@@ -141,7 +141,7 @@ describe("trilha de auditoria: cargos", () => {
       url: `${ROLES_URL}/${role.id}`,
       cookies: sessionCookiesFor(admin.id),
       payload: {
-        name: "Suporte",
+        name: "Suporte N2",
         description: "Depois",
         permissionIds: await findPermissionIds(["backoffice.users.read", "backoffice.roles.read"]),
       },
@@ -153,10 +153,14 @@ describe("trilha de auditoria: cargos", () => {
         entity: "Role",
         entityId: role.id,
         action: "update",
-        description: "Alterou um cargo",
+        description: 'Editou o cargo "Suporte N2".',
         before: { name: "Suporte", description: "Antes", permissions: "backoffice.users.read" },
-        after: { name: "Suporte", description: "Depois", permissions: "backoffice.roles.read, backoffice.users.read" },
-        changedFields: ["description", "permissions"],
+        after: {
+          name: "Suporte N2",
+          description: "Depois",
+          permissions: "backoffice.roles.read, backoffice.users.read",
+        },
+        changedFields: ["name", "description", "permissions"],
         userId: admin.id,
       }),
     ]);
@@ -177,7 +181,7 @@ describe("trilha de auditoria: cargos", () => {
     expect(await findAuditLogs(actor.companyId)).toEqual([]);
   });
 
-  it("excluir cargo registra o estado anterior", async () => {
+  it("excluir cargo registra o estado anterior e o nome na descrição", async () => {
     const admin = await createUser();
     const role = await createRole({
       companyId: admin.companyId,
@@ -197,7 +201,7 @@ describe("trilha de auditoria: cargos", () => {
         entity: "Role",
         entityId: role.id,
         action: "delete",
-        description: "Excluiu um cargo",
+        description: 'Excluiu o cargo "Temporário".',
         before: { name: "Temporário", description: null, permissions: "backoffice.users.read" },
         after: null,
         userId: admin.id,
@@ -221,7 +225,7 @@ describe("trilha de auditoria: cargos", () => {
   });
 
   describe("PUT /roles/:roleId/users", () => {
-    it("registra cada usuário que entra e que sai, com os cargos dele antes e depois", async () => {
+    it("registra cada usuário que entra e que sai, com os cargos dele antes e depois e os nomes na descrição", async () => {
       const admin = await createUser();
       const role = await createRole({
         companyId: admin.companyId,
@@ -234,8 +238,8 @@ describe("trilha de auditoria: cargos", () => {
         permissions: ["backoffice.users.read"],
       });
       const stays = await createUser({ companyId: admin.companyId, roleIds: [role.id] });
-      const leaves = await createUser({ companyId: admin.companyId, roleIds: [role.id, finance.id] });
-      const joins = await createUser({ companyId: admin.companyId, roleIds: [finance.id] });
+      const leaves = await createUser({ companyId: admin.companyId, name: "Saulo", roleIds: [role.id, finance.id] });
+      const joins = await createUser({ companyId: admin.companyId, name: "Jade", roleIds: [finance.id] });
 
       const response = await app.inject({
         method: "PUT",
@@ -255,7 +259,7 @@ describe("trilha de auditoria: cargos", () => {
             entity: "User",
             entityId: joins.id,
             action: "update",
-            description: "Incluiu um usuário em um cargo",
+            description: 'Incluiu o usuário "Jade" no cargo "Suporte".',
             before: { roles: "Financeiro" },
             after: { roles: "Financeiro, Suporte" },
             changedFields: ["roles"],
@@ -265,7 +269,7 @@ describe("trilha de auditoria: cargos", () => {
             entity: "User",
             entityId: leaves.id,
             action: "update",
-            description: "Retirou um usuário de um cargo",
+            description: 'Retirou o usuário "Saulo" do cargo "Suporte".',
             before: { roles: "Financeiro, Suporte" },
             after: { roles: "Financeiro" },
             changedFields: ["roles"],
@@ -281,8 +285,8 @@ describe("trilha de auditoria: cargos", () => {
         name: "Suporte",
         permissions: ["backoffice.users.read"],
       });
-      const first = await createUser({ companyId: admin.companyId, roleIds: [role.id] });
-      const second = await createUser({ companyId: admin.companyId, roleIds: [role.id] });
+      const first = await createUser({ companyId: admin.companyId, name: "Primeiro", roleIds: [role.id] });
+      const second = await createUser({ companyId: admin.companyId, name: "Segundo", roleIds: [role.id] });
       await createUser({ companyId: admin.companyId, roleIds: [role.id], deletedAt: new Date() });
 
       await app.inject({
@@ -295,8 +299,41 @@ describe("trilha de auditoria: cargos", () => {
       const logs = await findAuditLogs(admin.companyId);
 
       expect(logs.map((log) => log.entityId).toSorted()).toEqual([first.id, second.id].toSorted());
-      expect(logs.every((log) => log.description === "Retirou um usuário de um cargo")).toBe(true);
+      expect(logs.map((log) => log.description).toSorted()).toEqual([
+        'Retirou o usuário "Primeiro" do cargo "Suporte".',
+        'Retirou o usuário "Segundo" do cargo "Suporte".',
+      ]);
       expect(logs.map((log) => log.after)).toEqual([{ roles: null }, { roles: null }]);
+    });
+
+    it("os registros saem em ordem estável: quem entra na ordem do corpo, quem sai por nome", async () => {
+      const admin = await createUser();
+      const role = await createRole({
+        companyId: admin.companyId,
+        name: "Suporte",
+        permissions: ["backoffice.users.read"],
+      });
+      await createUser({ companyId: admin.companyId, name: "Bruno", roleIds: [role.id] });
+      await createUser({ companyId: admin.companyId, name: "Alice", roleIds: [role.id] });
+      const first = await createUser({ companyId: admin.companyId, name: "Primeira" });
+      const second = await createUser({ companyId: admin.companyId, name: "Segunda" });
+      const third = await createUser({ companyId: admin.companyId, name: "Terceira" });
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `${ROLES_URL}/${role.id}/users`,
+        cookies: sessionCookiesFor(admin.id),
+        payload: { userIds: [third.id, first.id, second.id] },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect((await findAuditLogs(admin.companyId)).map((log) => log.description)).toEqual([
+        'Incluiu o usuário "Terceira" no cargo "Suporte".',
+        'Incluiu o usuário "Primeira" no cargo "Suporte".',
+        'Incluiu o usuário "Segunda" no cargo "Suporte".',
+        'Retirou o usuário "Alice" do cargo "Suporte".',
+        'Retirou o usuário "Bruno" do cargo "Suporte".',
+      ]);
     });
 
     it("mesmo conjunto não grava registro", async () => {

@@ -1,6 +1,7 @@
 import { type Prisma } from "@/generated/prisma/client";
 import { assertExists, BadRequestError, NotFoundError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { type AuditEntry, recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
@@ -115,9 +116,16 @@ export async function setRoleUsersService({ companyId, actorId, roleId, userIds 
     const auditEntries: AuditEntry[] = [];
 
     if (added.length > 0) {
-      const found = await tx.user.count({ where: { id: { in: added }, companyId, ...notDeleted } });
+      // Limitada pela lista do corpo; o nome vai para a frase da trilha. Volta na ordem do corpo (`added` segue a
+      // lista), não na que o banco devolveu: os registros da trilha saem na mesma ordem a cada chamada.
+      const addedUsers = (
+        await tx.user.findMany({
+          where: { id: { in: added }, companyId, ...notDeleted },
+          select: { id: true, name: true },
+        })
+      ).toSorted((first, second) => added.indexOf(first.id) - added.indexOf(second.id));
 
-      if (found !== added.length) {
+      if (addedUsers.length !== added.length) {
         throw new NotFoundError("Um ou mais usuários informados não existem na base de dados.");
       }
 
@@ -127,25 +135,25 @@ export async function setRoleUsersService({ companyId, actorId, roleId, userIds 
 
       await tx.userRole.createMany({ data: added.map((userId) => ({ userId, roleId })), skipDuplicates: true });
 
-      for (const userId of added) {
-        const namesBefore = roleNamesBefore.get(userId) ?? [];
+      for (const user of addedUsers) {
+        const namesBefore = roleNamesBefore.get(user.id) ?? [];
 
         auditEntries.push(
           toMembershipAuditEntry({
             companyId,
-            userId,
+            userId: user.id,
             roleNamesBefore: namesBefore,
             roleNamesAfter: [...namesBefore, role.name],
-            description: "Incluiu um usuário em um cargo",
+            description: AUDIT_DESCRIPTIONS.User.addedToRole(user.name, role.name),
           }),
         );
       }
     }
 
     // Quem sai (vínculo de usuário não excluído da empresa, fora da lista) é apagado e devolvido pelo mesmo comando:
-    // o `RETURNING` traz os ids para a trilha sem uma leitura à parte do cargo inteiro. O que volta é exatamente o que
-    // a escrita apagou, então o custo acompanha a mudança, não o tamanho do cargo.
-    const removed = await tx.$queryRaw<{ userId: string }[]>`
+    // o `RETURNING` traz os ids e os nomes para a trilha sem uma leitura à parte do cargo inteiro. O que volta é
+    // exatamente o que a escrita apagou, então o custo acompanha a mudança, não o tamanho do cargo.
+    const removed = await tx.$queryRaw<{ userId: string; name: string }[]>`
       DELETE FROM user_roles AS link
       USING users AS member
       WHERE link."roleId" = ${roleId}
@@ -153,13 +161,21 @@ export async function setRoleUsersService({ companyId, actorId, roleId, userIds 
         AND member."companyId" = ${companyId}
         AND member."deletedAt" IS NULL
         AND link."userId" <> ALL(${[...wanted]}::text[])
-      RETURNING link."userId"`;
+      RETURNING link."userId", member.name`;
 
     if (removed.length > 0) {
-      const removedIds = removed.map((link) => link.userId);
-      const roleNamesAfter = await findRoleNamesByUser(tx, companyId, removedIds);
+      const roleNamesAfter = await findRoleNamesByUser(
+        tx,
+        companyId,
+        removed.map((link) => link.userId),
+      );
 
-      for (const userId of removedIds) {
+      // O `RETURNING` não tem ordem garantida: por nome e id, para a trilha sair na mesma ordem a cada chamada.
+      const removedInOrder = removed.toSorted(
+        (first, second) => first.name.localeCompare(second.name, "pt-BR") || first.userId.localeCompare(second.userId),
+      );
+
+      for (const { userId, name } of removedInOrder) {
         const namesAfter = roleNamesAfter.get(userId) ?? [];
 
         auditEntries.push(
@@ -168,7 +184,7 @@ export async function setRoleUsersService({ companyId, actorId, roleId, userIds 
             userId,
             roleNamesBefore: [...namesAfter, role.name],
             roleNamesAfter: namesAfter,
-            description: "Retirou um usuário de um cargo",
+            description: AUDIT_DESCRIPTIONS.User.removedFromRole(name, role.name),
           }),
         );
       }

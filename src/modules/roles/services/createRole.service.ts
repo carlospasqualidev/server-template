@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
 import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
@@ -42,7 +43,7 @@ export async function createRoleService({ companyId, actorId, data }: CreateRole
         entity: "Role",
         entityId: role.id,
         action: "create",
-        description: "Criou um cargo",
+        description: AUDIT_DESCRIPTIONS.Role.created(role.name),
         after: toRoleAuditSnapshot(role),
       },
       tx,

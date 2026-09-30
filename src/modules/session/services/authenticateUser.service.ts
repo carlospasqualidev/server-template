@@ -1,6 +1,7 @@
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { ForbiddenError, UnauthorizedError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { findEffectivePermissionsService } from "@/modules/permissions/services/findEffectivePermissions.service";
 import { recordLastLoginService } from "@/modules/session/services/recordLastLogin.service";
@@ -52,7 +53,7 @@ export async function authenticateUserService({ email, password }: { email: stri
         entity: "User",
         entityId: user.id,
         action: "login",
-        description: "Entrou no sistema",
+        description: AUDIT_DESCRIPTIONS.User.loggedIn(),
         userId: user.id,
       },
       tx,

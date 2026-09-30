@@ -10,6 +10,15 @@ export const searchQuerySchema = z
   .optional()
   .transform((value) => value || undefined);
 
+/**
+ * Padrão de `LIKE`/`ILIKE` para "contém o termo", com `\`, `%` e `_` escapados: o termo casa como texto literal
+ * (`50%` procura "50%", não "50" seguido de qualquer coisa; `_` não vale por um caractere qualquer). Só para SQL
+ * tagueado, como parâmetro (`` ILIKE ${toContainsLikePattern(search)} ``); a barra é o escape padrão do Postgres.
+ */
+export function toContainsLikePattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
+
 /** Booleano em query string (`?isActive=true`). Ausente vira `undefined` (sem filtro). */
 export const booleanQuerySchema = z
   .enum(["true", "false"])
@@ -36,23 +45,3 @@ export const csvQuerySchema = z
 export const dateTimeQuerySchema = dateTimeSchema
   .optional()
   .transform((value) => (value === undefined ? undefined : new Date(value)));
-
-interface DateTimeRangeFilter {
-  gte?: Date;
-  lte?: Date;
-}
-
-/**
- * Intervalo de datas **inclusivo nas duas pontas** para o `where` do Prisma, a partir de um par de
- * `dateTimeQuerySchema` (ex.: `createdFrom`/`createdTo`). Sem nenhuma das pontas, `undefined` (sem filtro).
- *
- * @example
- * ...(createdAt && { createdAt }) // const createdAt = toDateTimeRangeFilter(query.createdFrom, query.createdTo)
- */
-export function toDateTimeRangeFilter(from: Date | undefined, to: Date | undefined): DateTimeRangeFilter | undefined {
-  if (!from && !to) {
-    return undefined;
-  }
-
-  return { ...(from && { gte: from }), ...(to && { lte: to }) };
-}

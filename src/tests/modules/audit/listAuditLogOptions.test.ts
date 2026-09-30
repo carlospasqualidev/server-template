@@ -40,6 +40,7 @@ describe("GET /api/client/audit-logs/options", () => {
         { value: "delete", label: "Exclusão" },
         { value: "statusChange", label: "Mudança de status" },
         { value: "login", label: "Login" },
+        { value: "export", label: "Exportação" },
       ],
       entities: [
         { value: "User", label: "Usuário" },

@@ -106,7 +106,7 @@ Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm per
 | `PUT`    | `/roles/:roleId/users`    | sim       | `backoffice.roles.update` e `backoffice.users.update` | Define os usuários do cargo                                                                                        |
 | `GET`    | `/system-configs`         | sim       | `backoffice.systemConfigs.read`                       | Configurações da empresa (catálogo inteiro, valor gravado ou padrão)                                               |
 | `PATCH`  | `/system-configs`         | sim       | `backoffice.systemConfigs.update`                     | Grava configurações em lote (`{ items: [{ key, value }] }`), tudo ou nada                                          |
-| `GET`    | `/audit-logs`             | sim       | `backoffice.audit.read`                               | Trilha de auditoria paginada (filtros, período, busca, ordenação)                                                  |
+| `GET`    | `/audit-logs`             | sim       | `backoffice.audit.read`                               | Trilha de auditoria paginada (filtros, período, busca por conteúdo, ordenação)                                     |
 | `GET`    | `/audit-logs/options`     | sim       | `backoffice.audit.read`                               | Módulos, ações e entidades da trilha, com rótulo pt-BR                                                             |
 | `GET`    | `/audit-logs/:auditLogId` | sim       | `backoffice.audit.read`                               | Registro da trilha com antes, depois e autor                                                                       |
 | `POST`   | `/upload/file`            | sim       |                                                       | Envia um arquivo (campo `file`) para o S3                                                                          |
@@ -133,7 +133,9 @@ Cada empresa ajusta as configurações numa tela única. As definições (rótul
 
 ## Trilha de auditoria
 
-Toda mudança relevante numa empresa (usuários, cargos, vínculos entre eles, configurações) e todo login ficam registrados com autor, antes e depois, gravados na mesma transação da mudança: se ela falha, nada é registrado. Quem tem `backoffice.audit.read` consulta a trilha da própria empresa em `/audit-logs`, com filtros por módulo, entidade, ação, autor, registro e período, busca e detalhe. A trilha não guarda senha nem hash, e troca por `[omitido]` o valor de dado pessoal (nome, e-mail, telefone e foto do usuário, e-mail de suporte); o nome do autor vem do cadastro. IP e user-agent da requisição são gravados, mas não saem pela API. Como instrumentar uma mutação nova: [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria).
+Toda mudança relevante numa empresa (usuários, cargos, vínculos entre eles, configurações), todo login e toda exportação ficam registrados com autor, os valores antes e depois e uma frase que nomeia o registro (`Editou o usuário "Maria Alves".`), gravados na mesma transação da mudança: se ela falha, nada é registrado. Quem tem `backoffice.audit.read` consulta a trilha da própria empresa em `/audit-logs`, com filtros por módulo, entidade, ação, autor, registro e período, detalhe e busca por conteúdo, que acha um evento por qualquer valor gravado (um e-mail, um nome antigo). A trilha guarda dado pessoal (nome, e-mail, telefone e foto do usuário) por decisão do projeto, com finalidade de segurança e prestação de contas; prazo e anonimização ainda não existem. Nunca guarda senha, hash ou valor de configuração secreta; o nome do autor vem do cadastro. IP e user-agent da requisição são gravados, mas não saem pela API. Rota de exportação nova grava a exportação com formato e filtros. Como instrumentar uma mutação ou uma exportação: [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria).
+
+A busca usa índices trigram do Postgres: a migration `20260929234145_audit_logs_content_search` instala a extensão `pg_trgm` (`CREATE EXTENSION IF NOT EXISTS`). Ela vem no Postgres oficial e é confiável desde o 13 (o dono do banco a instala sem superusuário); num Postgres gerenciado, confirme que ela está liberada antes do `migrate deploy`.
 
 ## Estrutura
 
@@ -153,7 +155,7 @@ src/
     permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
     roles/          gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo
     systemConfigs/  configurações por empresa: catálogo no código, leitura, gravação em lote, timeout de inatividade
-    audit/          trilha de auditoria: gravação nas mutações, lista, detalhe e opções de filtro
+    audit/          trilha de auditoria: gravação nas mutações e exportações, frases, lista com busca, detalhe e opções
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado
@@ -175,7 +177,7 @@ O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e crede
 ## Docker e produção
 
 - `Dockerfile` multi-stage: compila em `node:22-slim`, roda `dist/server.js` só com dependências de produção.
-- Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão. A subida depende disso: antes do `listen` o servidor sincroniza o catálogo de permissões e, se falhar, encerra com erro.
+- Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão. A subida depende disso: antes do `listen` o servidor sincroniza o catálogo de permissões e, se falhar, encerra com erro. O usuário do banco precisa poder criar a extensão `pg_trgm` (ver **Trilha de auditoria**).
 - Health checks para o orquestrador: `/health` (liveness) e `/health/ready` (readiness).
 - O processo encerra com `SIGTERM` fechando conexões (graceful shutdown).
 

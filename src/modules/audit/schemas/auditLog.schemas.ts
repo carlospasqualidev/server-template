@@ -22,11 +22,13 @@ const auditLogBaseSchema = z.object({
   description: z
     .string()
     .nullable()
-    .describe("Resumo pt-BR no passado, sem nome, e-mail ou outro dado pessoal.")
-    .meta({ examples: ["Bloqueou um usuário"] }),
+    .describe(
+      "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
+    )
+    .meta({ examples: ['Bloqueou o usuário "Maria Alves".'] }),
   changedFields: z
     .array(z.string())
-    .describe("Campos alterados, para destacar no detalhe. Vazio em criação, exclusão e login."),
+    .describe("Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."),
   userId: z.string().nullable().describe("Autor da ação; null quando foi o sistema."),
   createdAt: dateTimeOutputSchema,
 });
@@ -42,9 +44,11 @@ const auditSnapshotSchema = z.record(z.string(), z.union([z.string(), z.number()
 
 export const auditLogDetailSchema = auditLogBaseSchema.extend({
   before: auditSnapshotSchema.describe(
-    "Estado anterior, só com valores primitivos; null na criação e no login. Senha e hash nunca aparecem; dado pessoal aparece como `[omitido]`.",
+    "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`.",
   ),
-  after: auditSnapshotSchema.describe("Estado posterior, no mesmo formato; null na exclusão e no login."),
+  after: auditSnapshotSchema.describe(
+    "Estado posterior, no mesmo formato; null na exclusão e no login. Na exportação, o formato e os filtros aplicados, com chave pt-BR (`formato`, `busca`...).",
+  ),
   user: z
     .object({
       id: z.string().describe("Identificador do autor."),

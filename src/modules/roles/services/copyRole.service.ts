@@ -1,5 +1,6 @@
 import { assertExists, BadRequestError, ConflictError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
 import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
@@ -75,7 +76,7 @@ export async function copyRoleService({ companyId, actorId, roleId }: CopyRoleIn
         entity: "Role",
         entityId: role.id,
         action: "create",
-        description: "Copiou um cargo",
+        description: AUDIT_DESCRIPTIONS.Role.copied(source.name, role.name),
         after: toRoleAuditSnapshot(role),
       },
       tx,

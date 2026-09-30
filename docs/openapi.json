@@ -6023,7 +6023,7 @@
         "tags": [
           "AuditLogs"
         ],
-        "description": "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
+        "description": "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca por conteúdo (inclusive nos valores de antes e depois) e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
         "parameters": [
           {
             "schema": {
@@ -6105,7 +6105,7 @@
             "in": "query",
             "name": "action",
             "required": false,
-            "description": "Ações, separadas por vírgula: create, update, delete, statusChange, login."
+            "description": "Ações, separadas por vírgula: create, update, delete, statusChange, login, export."
           },
           {
             "schema": {
@@ -6156,7 +6156,7 @@
             "in": "query",
             "name": "search",
             "required": false,
-            "description": "Busca na descrição, na entidade, no id do registro e no nome do autor (contém, sem diferenciar maiúsculas)."
+            "description": "Busca por conteúdo (contém, sem diferenciar maiúsculas, texto literal: `%` e `_` não são curinga): na descrição, no id do registro, no nome do autor (também de usuário excluído), nos valores gravados em `before`/`after` (ex.: um e-mail, um nome antigo; o nome de um campo, como `email`, não casa) e na entidade, pelo nome técnico ou pelo rótulo (`usuário` traz os eventos de `User`)."
           }
         ],
         "security": [
@@ -6209,24 +6209,25 @@
                               "update",
                               "delete",
                               "statusChange",
-                              "login"
+                              "login",
+                              "export"
                             ],
                             "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
                           },
                           "description": {
-                            "description": "Resumo pt-BR no passado, sem nome, e-mail ou outro dado pessoal.",
+                            "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
                             "type": [
                               "string",
                               "null"
                             ],
-                            "example": "Bloqueou um usuário"
+                            "example": "Bloqueou o usuário \"Maria Alves\"."
                           },
                           "changedFields": {
                             "type": "array",
                             "items": {
                               "type": "string"
                             },
-                            "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão e login."
+                            "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."
                           },
                           "userId": {
                             "description": "Autor da ação; null quando foi o sistema.",
@@ -6664,24 +6665,25 @@
                             "update",
                             "delete",
                             "statusChange",
-                            "login"
+                            "login",
+                            "export"
                           ],
                           "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
                         },
                         "description": {
-                          "description": "Resumo pt-BR no passado, sem nome, e-mail ou outro dado pessoal.",
+                          "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
                           "type": [
                             "string",
                             "null"
                           ],
-                          "example": "Bloqueou um usuário"
+                          "example": "Bloqueou o usuário \"Maria Alves\"."
                         },
                         "changedFields": {
                           "type": "array",
                           "items": {
                             "type": "string"
                           },
-                          "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão e login."
+                          "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."
                         },
                         "userId": {
                           "description": "Autor da ação; null quando foi o sistema.",
@@ -6714,7 +6716,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Estado anterior, só com valores primitivos; null na criação e no login. Senha e hash nunca aparecem; dado pessoal aparece como `[omitido]`."
+                          "description": "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`."
                         },
                         "after": {
                           "anyOf": [
@@ -6736,7 +6738,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Estado posterior, no mesmo formato; null na exclusão e no login."
+                          "description": "Estado posterior, no mesmo formato; null na exclusão e no login. Na exportação, o formato e os filtros aplicados, com chave pt-BR (`formato`, `busca`...)."
                         },
                         "user": {
                           "anyOf": [

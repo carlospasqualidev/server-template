@@ -5,8 +5,9 @@ export type AuditValue = string | number | boolean | null;
 export type AuditSnapshot = Record<string, AuditValue>;
 
 /**
- * Marcador que substitui o valor de um campo com dado pessoal, ou de uma configuração marcada com `redactInAudit`: a
- * trilha registra que o campo mudou, sem guardar o valor. `null` continua `null` (ausência de dado não é dado).
+ * Marcador que substitui um valor que a trilha não guarda: o de uma configuração secreta (`redactInAudit`), na
+ * gravação, e o dos campos pessoais, quando a retenção anonimiza o registro. A trilha continua dizendo que o campo
+ * mudou. `null` continua `null` (ausência de dado não é dado).
  */
 export const AUDIT_REDACTED_VALUE = "[omitido]";
 
@@ -92,7 +93,10 @@ export function computeChangedFields(before: AuditSnapshot | null, after: AuditS
   return [...fields].filter((field) => beforeValues.get(field) !== afterValues.get(field));
 }
 
-/** Troca pelo marcador o valor dos `fields` (dado pessoal, configuração redigida). Rode depois do diff. */
+/**
+ * Troca pelo marcador o valor dos `fields`: configuração secreta na gravação (depois do diff), campos pessoais na
+ * anonimização de um registro já gravado.
+ */
 export function redactAuditable(snapshot: AuditSnapshot | null, fields: ReadonlySet<string>): AuditSnapshot | null {
   if (!snapshot || fields.size === 0) {
     return snapshot;

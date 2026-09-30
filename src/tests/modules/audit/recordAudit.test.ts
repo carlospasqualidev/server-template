@@ -17,7 +17,7 @@ describe("recordAuditService", () => {
             entity: "User",
             entityId: null,
             action: "create",
-            description: "Cadastrou um usuário",
+            description: 'Criou o usuário "Ana".',
             after: { isActive: true },
           },
           tx,
@@ -41,7 +41,7 @@ describe("recordAuditService", () => {
           entity: "SystemConfig",
           entityId: "app.name",
           action: "update",
-          description: "Alterou uma configuração",
+          description: 'Alterou a configuração "Nome da aplicação".',
           before: { value: "A" },
           after: { value: "B" },
         },
@@ -62,7 +62,7 @@ describe("recordAuditService", () => {
     ]);
   });
 
-  it("autor explícito, dados pessoais da entidade redigidos depois do diff e segredo só como campo alterado", async () => {
+  it("autor explícito, dados pessoais gravados com o valor e segredo fora, só como campo alterado", async () => {
     const user = await createUser();
 
     await prisma.$transaction((tx) =>
@@ -73,7 +73,7 @@ describe("recordAuditService", () => {
           entity: "User",
           entityId: user.id,
           action: "update",
-          description: "Alterou um usuário",
+          description: 'Editou o usuário "Ana".',
           before: { name: "Ana", email: "ana@example.com", phone: null, isActive: true, password: "hash-antigo" },
           after: { name: "Ana", email: "ana.maria@example.com", phone: null, isActive: true, password: "hash-novo" },
           hiddenChangedFields: ["password"],
@@ -87,11 +87,44 @@ describe("recordAuditService", () => {
 
     expect(log).toMatchObject({
       userId: user.id,
+      description: 'Editou o usuário "Ana".',
       changedFields: ["email", "password"],
-      before: { name: "[omitido]", email: "[omitido]", phone: null, isActive: true },
-      after: { name: "[omitido]", email: "[omitido]", phone: null, isActive: true },
+      before: { name: "Ana", email: "ana@example.com", phone: null, isActive: true },
+      after: { name: "Ana", email: "ana.maria@example.com", phone: null, isActive: true },
     });
-    expect(JSON.stringify(log)).not.toMatch(/hash-antigo|hash-novo|ana\.maria@example\.com/);
+    expect(JSON.stringify(log)).not.toMatch(/hash-antigo|hash-novo/);
+  });
+
+  it("`redactedFields` (valor secreto) vira o marcador depois do diff: registra que mudou, sem o valor", async () => {
+    const company = await createCompany();
+
+    await prisma.$transaction((tx) =>
+      recordAuditService(
+        {
+          companyId: company.id,
+          module: "SETTINGS",
+          entity: "SystemConfig",
+          entityId: "integration.apiKey",
+          action: "update",
+          description: 'Alterou a configuração "Chave da integração".',
+          before: { value: "chave-antiga" },
+          after: { value: "chave-nova" },
+          redactedFields: ["value"],
+        },
+        tx,
+      ),
+    );
+
+    const logs = await findAuditLogs(company.id);
+
+    expect(logs).toEqual([
+      expect.objectContaining({
+        before: { value: "[omitido]" },
+        after: { value: "[omitido]" },
+        changedFields: ["value"],
+      }),
+    ]);
+    expect(JSON.stringify(logs)).not.toMatch(/chave-antiga|chave-nova/);
   });
 
   it("`update` sem campo alterado não é gravado; lista grava todos os demais numa inserção", async () => {
@@ -106,7 +139,7 @@ describe("recordAuditService", () => {
             entity: "SystemConfig",
             entityId: "app.name",
             action: "update",
-            description: "Alterou uma configuração",
+            description: 'Alterou a configuração "Nome da aplicação".',
             before: { value: "Igual" },
             after: { value: "Igual" },
           },
@@ -116,7 +149,7 @@ describe("recordAuditService", () => {
             entity: "SystemConfig",
             entityId: "notifications.email",
             action: "update",
-            description: "Alterou uma configuração",
+            description: 'Alterou a configuração "Notificações por e-mail".',
             before: { value: "true" },
             after: { value: "false" },
           },

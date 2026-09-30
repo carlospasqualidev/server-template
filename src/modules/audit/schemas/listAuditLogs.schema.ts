@@ -7,8 +7,10 @@ import { errorResponseSchema } from "@/lib/http/responses";
 import { idSchema } from "@/lib/validation/schemas";
 import { auditLogListItemSchema } from "@/modules/audit/schemas/auditLog.schemas";
 
-/** Allowlist de ordenação: só estes campos chegam ao `orderBy` do Prisma. O autor não é ordenável. */
+/** Allowlist de ordenação: cada campo vira uma coluna fixa no `ORDER BY`. O autor não é ordenável. */
 export const AUDIT_LOG_SORT_FIELDS = ["createdAt", "module", "entity", "action", "description"] as const;
+
+export type AuditLogSortField = (typeof AUDIT_LOG_SORT_FIELDS)[number];
 
 export const listAuditLogsQuerySchema = paginationQuerySchema
   .extend(sortQuerySchema(AUDIT_LOG_SORT_FIELDS, { orderBy: "createdAt", order: "desc" }).shape)
@@ -31,7 +33,7 @@ export const listAuditLogsQuerySchema = paginationQuerySchema
     createdFrom: dateTimeQuerySchema.describe("Início do período (inclusivo), ISO 8601 em UTC."),
     createdTo: dateTimeQuerySchema.describe("Fim do período (inclusivo), ISO 8601 em UTC."),
     search: searchQuerySchema.describe(
-      "Busca na descrição, na entidade, no id do registro e no nome do autor (contém, sem diferenciar maiúsculas).",
+      "Busca por conteúdo (contém, sem diferenciar maiúsculas, texto literal: `%` e `_` não são curinga): na descrição, no id do registro, no nome do autor (também de usuário excluído), nos valores gravados em `before`/`after` (ex.: um e-mail, um nome antigo; o nome de um campo, como `email`, não casa) e na entidade, pelo nome técnico ou pelo rótulo (`usuário` traz os eventos de `User`).",
     ),
   });
 
@@ -46,7 +48,7 @@ export const listAuditLogsRouteSchema = {
   tags: ["AuditLogs"],
   summary: "Lista a trilha de auditoria da empresa",
   description:
-    "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
+    "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca por conteúdo (inclusive nos valores de antes e depois) e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
   security: [{ cookieAuth: [] }],
   querystring: listAuditLogsQuerySchema,
   response: {

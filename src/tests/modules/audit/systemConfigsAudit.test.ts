@@ -32,7 +32,7 @@ describe("trilha de auditoria: configurações de sistema", () => {
     });
   }
 
-  it("um registro por chave alterada, com o antes efetivo (padrão quando não havia valor) e a chave como entityId", async () => {
+  it("um registro por chave alterada, com o antes efetivo (padrão quando não havia valor), a chave como entityId e o rótulo na descrição", async () => {
     const admin = await createUser();
     await createSystemConfig({ companyId: admin.companyId, key: "security.idleTimeoutMinutes", value: "30" });
 
@@ -52,7 +52,7 @@ describe("trilha de auditoria: configurações de sistema", () => {
           entity: "SystemConfig",
           entityId: "app.name",
           action: "update",
-          description: "Alterou uma configuração",
+          description: 'Alterou a configuração "Nome da aplicação".',
           before: { value: "Meu Produto" },
           after: { value: "Painel ACME" },
           changedFields: ["value"],
@@ -60,6 +60,7 @@ describe("trilha de auditoria: configurações de sistema", () => {
         }),
         expect.objectContaining({
           entityId: "security.idleTimeoutMinutes",
+          description: 'Alterou a configuração "Tempo de inatividade até o logout (min)".',
           before: { value: "30" },
           after: { value: "45" },
         }),
@@ -80,22 +81,20 @@ describe("trilha de auditoria: configurações de sistema", () => {
     expect(await findAuditLogs(admin.companyId)).toEqual([]);
   });
 
-  it("chave com `redactInAudit` (e-mail de suporte) registra que mudou, sem o endereço", async () => {
+  it("e-mail de suporte não é segredo: registra o endereço antes e depois", async () => {
     const admin = await createUser();
 
     await patchConfigs(admin.id, [{ key: "app.supportEmail", value: "ajuda@acme.example.com" }]);
 
-    const logs = await findAuditLogs(admin.companyId);
-
-    expect(logs).toEqual([
+    expect(await findAuditLogs(admin.companyId)).toEqual([
       expect.objectContaining({
         entityId: "app.supportEmail",
-        before: { value: "[omitido]" },
-        after: { value: "[omitido]" },
+        description: 'Alterou a configuração "E-mail de suporte".',
+        before: { value: "suporte@example.com" },
+        after: { value: "ajuda@acme.example.com" },
         changedFields: ["value"],
       }),
     ]);
-    expect(JSON.stringify(logs)).not.toMatch(/ajuda@acme|suporte@example/);
   });
 
   it("lote inválido responde 400 e não grava registro", async () => {

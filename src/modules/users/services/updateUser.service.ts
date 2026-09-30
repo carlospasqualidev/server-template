@@ -2,6 +2,7 @@ import { type Prisma } from "@/generated/prisma/client";
 import { hashPassword } from "@/lib/auth/password";
 import { assertExists, BadRequestError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { type AuditEntry, recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { isLastActiveAdminService } from "@/modules/permissions/services/isLastActiveAdmin.service";
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
@@ -39,7 +40,7 @@ function toUserChangeAuditEntries({ companyId, before, after, passwordChanged }:
       entity: "User",
       entityId: after.id,
       action: "update",
-      description: "Alterou um usuário",
+      description: AUDIT_DESCRIPTIONS.User.updated(after.name),
       before: fieldsBefore,
       after: fieldsAfter,
       hiddenChangedFields: passwordChanged ? ["password"] : [],
@@ -53,7 +54,9 @@ function toUserChangeAuditEntries({ companyId, before, after, passwordChanged }:
       entity: "User",
       entityId: after.id,
       action: "statusChange",
-      description: isActive ? "Desbloqueou um usuário" : "Bloqueou um usuário",
+      description: isActive
+        ? AUDIT_DESCRIPTIONS.User.unblocked(after.name)
+        : AUDIT_DESCRIPTIONS.User.blocked(after.name),
       before: { isActive: wasActive },
       after: { isActive },
     });

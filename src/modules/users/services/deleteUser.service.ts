@@ -1,5 +1,6 @@
 import { assertExists, BadRequestError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { isLastActiveAdminService } from "@/modules/permissions/services/isLastActiveAdmin.service";
 import { lockCompanyAdminsService } from "@/modules/permissions/services/lockCompanyAdmins.service";
@@ -41,7 +42,7 @@ export async function deleteUserService({ companyId, userId, currentUserId }: De
         entity: "User",
         entityId: userId,
         action: "delete",
-        description: "Excluiu um usuário",
+        description: AUDIT_DESCRIPTIONS.User.deleted(before.name),
         before,
       },
       tx,

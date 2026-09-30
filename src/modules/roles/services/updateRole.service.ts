@@ -1,5 +1,6 @@
 import { assertExists, BadRequestError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
 import { toRoleAuditSnapshot } from "@/modules/roles/roles.audit";
@@ -69,7 +70,7 @@ export async function updateRoleService({ companyId, actorId, roleId, data }: Up
         entity: "Role",
         entityId: roleId,
         action: "update",
-        description: "Alterou um cargo",
+        description: AUDIT_DESCRIPTIONS.Role.updated(updated.name),
         before: toRoleAuditSnapshot(before),
         after: toRoleAuditSnapshot(updated),
       },

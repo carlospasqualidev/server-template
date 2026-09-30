@@ -33,8 +33,6 @@ export const SYSTEM_CONFIG_CATALOG = [
     valueType: "string",
     defaultValue: "suporte@example.com",
     rule: emailSchema,
-    // Pode ser o e-mail de uma pessoa: a trilha registra a mudança sem o endereço.
-    redactInAudit: true,
   },
   {
     key: "security.idleTimeoutMinutes",

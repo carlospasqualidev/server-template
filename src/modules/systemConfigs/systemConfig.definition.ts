@@ -35,8 +35,9 @@ interface SystemConfigDefinitionOf<TType extends SystemConfigValueType> {
   /** Regra da chave sobre o valor já convertido (faixa, formato, tamanho). Sem ela, vale só o tipo. */
   rule?: z.ZodType<SystemConfigValueByType[TType], SystemConfigValueByType[TType]>;
   /**
-   * O valor pode ser dado pessoal (ex.: e-mail de uma pessoa) ou sensível: a trilha de auditoria registra que a chave
-   * mudou, com o valor trocado por um marcador fixo em `before`/`after`.
+   * O valor é secreto (ex.: chave de API, senha de integração): a trilha de auditoria registra que a chave mudou, com o
+   * valor trocado por um marcador fixo em `before`/`after`. Dado pessoal (ex.: e-mail de uma pessoa) não é segredo e
+   * não leva esta marca: a trilha guarda o valor, e a retenção cuida dele.
    */
   redactInAudit?: true;
 }

@@ -1,5 +1,6 @@
 import { assertExists, BadRequestError, NotFoundError } from "@/lib/errors";
 import { notDeleted, prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { ADMIN_ROLE } from "@/modules/permissions/permission.catalog";
 import { assertCanGrantPermissionsService } from "@/modules/permissions/services/assertCanGrantPermissions.service";
@@ -41,6 +42,7 @@ export async function setUserRolesService({ companyId, actorId, userId, roleIds 
     const target = await tx.user.findFirst({
       where: { id: userId, companyId, ...notDeleted },
       select: {
+        name: true,
         userRoles: {
           where: { role: { companyId, ...notDeleted } },
           select: { roleId: true, role: { select: { name: true, isSystem: true } } },
@@ -93,7 +95,7 @@ export async function setUserRolesService({ companyId, actorId, userId, roleIds 
         entity: "User",
         entityId: userId,
         action: "update",
-        description: "Alterou os cargos de um usuário",
+        description: AUDIT_DESCRIPTIONS.User.rolesChanged(target.name),
         before: toUserRolesAuditSnapshot(target.userRoles.map((userRole) => userRole.role.name)),
         after: toUserRolesAuditSnapshot(roles.map((role) => role.name)),
       },

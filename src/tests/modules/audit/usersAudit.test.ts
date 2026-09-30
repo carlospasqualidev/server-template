@@ -8,7 +8,6 @@ import { createRole, createUser, findAdminRole, findAuditLogs } from "@/tests/he
 import { sessionCookiesFor } from "@/tests/helpers/session";
 
 const USERS_URL = "/api/client/users";
-const REDACTED = "[omitido]";
 
 describe("trilha de auditoria: usuários", () => {
   let app: App;
@@ -22,7 +21,7 @@ describe("trilha de auditoria: usuários", () => {
   });
 
   describe("POST /users", () => {
-    it("registra a criação com autor, metadados da requisição e dado pessoal redigido", async () => {
+    it("registra a criação com autor, metadados da requisição, os dados pessoais e o nome na descrição", async () => {
       const admin = await createUser();
 
       const response = await app.inject({
@@ -51,13 +50,13 @@ describe("trilha de auditoria: usuários", () => {
           entity: "User",
           entityId: created.id,
           action: "create",
-          description: "Cadastrou um usuário",
+          description: 'Criou o usuário "Marina Alves".',
           before: null,
           after: {
-            name: REDACTED,
-            email: REDACTED,
+            name: "Marina Alves",
+            email: "marina@example.com",
             image: null,
-            phone: REDACTED,
+            phone: "48999999999",
             isActive: true,
             idleTimeoutMinutes: 30,
           },
@@ -70,7 +69,7 @@ describe("trilha de auditoria: usuários", () => {
       ]);
     });
 
-    it("senha e hash nunca aparecem no registro", async () => {
+    it("senha e hash nunca aparecem no registro; o e-mail fica no depois, nunca na descrição", async () => {
       const admin = await createUser();
 
       await app.inject({
@@ -86,12 +85,14 @@ describe("trilha de auditoria: usuários", () => {
       });
 
       const stored = await prisma.user.findUniqueOrThrow({ where: { email: "ana@example.com" } });
-      const serialized = JSON.stringify(await findAuditLogs(admin.companyId));
+      const logs = await findAuditLogs(admin.companyId);
+      const serialized = JSON.stringify(logs);
 
       expect(serialized).not.toContain("senha-secreta-9");
       expect(serialized).not.toContain(stored.password);
       expect(serialized).not.toContain("password");
-      expect(serialized).not.toContain("ana@example.com");
+      expect(logs).toEqual([expect.objectContaining({ after: expect.objectContaining({ email: "ana@example.com" }) })]);
+      expect(logs.at(0)?.description).not.toContain("ana@example.com");
     });
 
     it("user-agent longo é cortado no limite", async () => {
@@ -131,9 +132,14 @@ describe("trilha de auditoria: usuários", () => {
   });
 
   describe("PATCH /users/:userId", () => {
-    it("edição registra antes e depois com os campos alterados", async () => {
+    it("edição registra antes e depois com os valores (nome antigo e novo) e o nome atual na descrição", async () => {
       const admin = await createUser();
-      const target = await createUser({ companyId: admin.companyId, idleTimeoutMinutes: 30 });
+      const target = await createUser({
+        companyId: admin.companyId,
+        name: "Nome Antigo",
+        email: "alvo@example.com",
+        idleTimeoutMinutes: 30,
+      });
 
       const response = await app.inject({
         method: "PATCH",
@@ -149,9 +155,15 @@ describe("trilha de auditoria: usuários", () => {
           entity: "User",
           entityId: target.id,
           action: "update",
-          description: "Alterou um usuário",
-          before: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: 30 },
-          after: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: 90 },
+          description: 'Editou o usuário "Outro Nome".',
+          before: {
+            name: "Nome Antigo",
+            email: "alvo@example.com",
+            image: null,
+            phone: null,
+            idleTimeoutMinutes: 30,
+          },
+          after: { name: "Outro Nome", email: "alvo@example.com", image: null, phone: null, idleTimeoutMinutes: 90 },
           changedFields: ["name", "idleTimeoutMinutes"],
           userId: admin.id,
         }),
@@ -163,6 +175,8 @@ describe("trilha de auditoria: usuários", () => {
       const role = await createRole({ companyId: admin.companyId, name: "Suporte" });
       const target = await createUser({
         companyId: admin.companyId,
+        name: "Rui",
+        email: "rui@example.com",
         roleIds: [role.id],
         lastLoginAt: new Date("2026-09-20T10:00:00.000Z"),
       });
@@ -182,8 +196,8 @@ describe("trilha de auditoria: usuários", () => {
       expect(await findAuditLogs(admin.companyId)).toEqual([
         expect.objectContaining({
           action: "update",
-          before: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: null },
-          after: { name: REDACTED, email: REDACTED, image: null, phone: null, idleTimeoutMinutes: 45 },
+          before: { name: "Rui", email: "rui@example.com", image: null, phone: null, idleTimeoutMinutes: null },
+          after: { name: "Rui", email: "rui@example.com", image: null, phone: null, idleTimeoutMinutes: 45 },
           changedFields: ["idleTimeoutMinutes"],
         }),
       ]);
@@ -191,7 +205,7 @@ describe("trilha de auditoria: usuários", () => {
 
     it("troca de senha aparece só como campo alterado, sem valor", async () => {
       const admin = await createUser();
-      const target = await createUser({ companyId: admin.companyId });
+      const target = await createUser({ companyId: admin.companyId, name: "Lia" });
 
       await app.inject({
         method: "PATCH",
@@ -203,15 +217,21 @@ describe("trilha de auditoria: usuários", () => {
       const logs = await findAuditLogs(admin.companyId);
       const updated = await prisma.user.findUniqueOrThrow({ where: { id: target.id } });
 
-      expect(logs).toEqual([expect.objectContaining({ action: "update", changedFields: ["password"] })]);
+      expect(logs).toEqual([
+        expect.objectContaining({
+          action: "update",
+          description: 'Editou o usuário "Lia".',
+          changedFields: ["password"],
+        }),
+      ]);
       expect(JSON.stringify(logs)).not.toContain("nova-senha-1");
       expect(JSON.stringify(logs)).not.toContain(updated.password);
       expect(JSON.stringify(logs)).not.toContain(target.password);
     });
 
-    it("bloquear registra `statusChange` em SECURITY", async () => {
+    it("bloquear registra `statusChange` em SECURITY, com o nome na descrição", async () => {
       const admin = await createUser();
-      const target = await createUser({ companyId: admin.companyId });
+      const target = await createUser({ companyId: admin.companyId, name: "Caio" });
 
       await app.inject({
         method: "PATCH",
@@ -226,7 +246,7 @@ describe("trilha de auditoria: usuários", () => {
           entity: "User",
           entityId: target.id,
           action: "statusChange",
-          description: "Bloqueou um usuário",
+          description: 'Bloqueou o usuário "Caio".',
           before: { isActive: true },
           after: { isActive: false },
           changedFields: ["isActive"],
@@ -237,7 +257,7 @@ describe("trilha de auditoria: usuários", () => {
 
     it("desbloquear registra `statusChange` com a descrição própria", async () => {
       const admin = await createUser();
-      const target = await createUser({ companyId: admin.companyId, isActive: false });
+      const target = await createUser({ companyId: admin.companyId, name: "Caio", isActive: false });
 
       await app.inject({
         method: "PATCH",
@@ -249,7 +269,7 @@ describe("trilha de auditoria: usuários", () => {
       expect(await findAuditLogs(admin.companyId)).toEqual([
         expect.objectContaining({
           action: "statusChange",
-          description: "Desbloqueou um usuário",
+          description: 'Desbloqueou o usuário "Caio".',
           before: { isActive: false },
           after: { isActive: true },
         }),
@@ -307,23 +327,32 @@ describe("trilha de auditoria: usuários", () => {
   });
 
   describe("DELETE /users/:userId", () => {
-    it("registra a exclusão com o estado anterior", async () => {
+    it("registra a exclusão com o estado anterior e o nome na descrição", async () => {
       const admin = await createUser();
-      const target = await createUser({ companyId: admin.companyId, isActive: false });
+      const target = await createUser({
+        companyId: admin.companyId,
+        name: "Davi Rocha",
+        email: "davi@example.com",
+        image: "https://cdn.example.com/davi.png",
+        isActive: false,
+      });
 
       await app.inject({ method: "DELETE", url: `${USERS_URL}/${target.id}`, cookies: sessionCookiesFor(admin.id) });
 
-      expect(await findAuditLogs(admin.companyId)).toEqual([
+      const logs = await findAuditLogs(admin.companyId);
+
+      expect(JSON.stringify(logs)).not.toContain(target.password);
+      expect(logs).toEqual([
         expect.objectContaining({
           module: "USERS",
           entity: "User",
           entityId: target.id,
           action: "delete",
-          description: "Excluiu um usuário",
+          description: 'Excluiu o usuário "Davi Rocha".',
           before: {
-            name: REDACTED,
-            email: REDACTED,
-            image: null,
+            name: "Davi Rocha",
+            email: "davi@example.com",
+            image: "https://cdn.example.com/davi.png",
             phone: null,
             isActive: false,
             idleTimeoutMinutes: null,
@@ -363,7 +392,7 @@ describe("trilha de auditoria: usuários", () => {
         name: "Financeiro",
         permissions: ["backoffice.users.read"],
       });
-      const target = await createUser({ companyId: admin.companyId, roleIds: [support.id] });
+      const target = await createUser({ companyId: admin.companyId, name: "Eva", roleIds: [support.id] });
 
       const response = await app.inject({
         method: "PUT",
@@ -379,7 +408,7 @@ describe("trilha de auditoria: usuários", () => {
           entity: "User",
           entityId: target.id,
           action: "update",
-          description: "Alterou os cargos de um usuário",
+          description: 'Alterou os cargos do usuário "Eva".',
           before: { roles: "Suporte" },
           after: { roles: "Administrador, Financeiro, Suporte" },
           changedFields: ["roles"],

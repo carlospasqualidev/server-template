@@ -35,7 +35,7 @@ describe("trilha de auditoria: sessão", () => {
         entity: "User",
         entityId: user.id,
         action: "login",
-        description: "Entrou no sistema",
+        description: "Entrou no sistema.",
         before: null,
         after: null,
         changedFields: [],
@@ -67,7 +67,7 @@ describe("trilha de auditoria: sessão", () => {
     expect(await findAuditLogs(user.companyId)).toEqual([]);
   });
 
-  it("register registra a criação do usuário na empresa nova, com ele mesmo como autor", async () => {
+  it("register registra a criação do usuário na empresa nova, com ele mesmo como autor, os dados e o nome", async () => {
     const response = await app.inject({
       method: "POST",
       url: `${SESSION_URL}/register`,
@@ -76,7 +76,7 @@ describe("trilha de auditoria: sessão", () => {
 
     expect(response.statusCode).toBe(201);
     const { id: userId } = response.json().user;
-    const { companyId } = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    const { companyId, password } = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const logs = await findAuditLogs(companyId);
 
     expect(logs).toEqual([
@@ -85,13 +85,15 @@ describe("trilha de auditoria: sessão", () => {
         entity: "User",
         entityId: userId,
         action: "create",
-        description: "Criou a própria conta",
+        description: 'Criou a própria conta como "Marina Alves".',
         before: null,
-        after: { name: "[omitido]", email: "[omitido]", image: null, idleTimeoutMinutes: null },
+        after: { name: "Marina Alves", email: "marina@example.com", image: null, idleTimeoutMinutes: null },
         userId,
       }),
     ]);
-    expect(JSON.stringify(logs)).not.toMatch(/senha-forte-1|marina@example\.com|Marina Alves/);
+    expect(JSON.stringify(logs)).not.toContain("senha-forte-1");
+    expect(JSON.stringify(logs)).not.toContain(password);
+    expect(logs.at(0)?.description).not.toContain("marina@example.com");
   });
 
   it("register com e-mail repetido responde 409 e não grava registro", async () => {

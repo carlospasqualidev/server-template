@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { type AuditEntry, recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { type UpdateSystemConfigsBody } from "@/modules/systemConfigs/schemas/updateSystemConfigs.schema";
 import { listSystemConfigsService } from "@/modules/systemConfigs/services/listSystemConfigs.service";
@@ -64,7 +65,7 @@ export async function updateSystemConfigsService({ companyId, items }: UpdateSys
           entity: "SystemConfig",
           entityId: key,
           action: "update",
-          description: "Alterou uma configuração",
+          description: AUDIT_DESCRIPTIONS.SystemConfig.updated(definition.label),
           before: {
             value: serializeSystemConfigValue(definition, resolveSystemConfigValue(definition, storedValues.get(key))),
           },

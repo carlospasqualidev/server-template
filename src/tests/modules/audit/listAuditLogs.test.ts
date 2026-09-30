@@ -207,10 +207,16 @@ describe("GET /api/client/audit-logs", () => {
     it("busca na descrição, na entidade, no id do registro e no nome do autor, sem diferenciar maiúsculas", async () => {
       const admin = await createUser({ name: "Admin" });
       const author = await createUser({ companyId: admin.companyId, name: "Carla Souza" });
+      const formerAuthor = await createUser({
+        companyId: admin.companyId,
+        name: "Otávio Desligado",
+        deletedAt: new Date(),
+      });
       const byDescription = await createAuditLog({ companyId: admin.companyId, description: "Bloqueou um usuário" });
       const byEntity = await createAuditLog({ companyId: admin.companyId, entity: "SystemConfig" });
       const byEntityId = await createAuditLog({ companyId: admin.companyId, entityId: "security.idleTimeoutMinutes" });
       const byAuthor = await createAuditLog({ companyId: admin.companyId, userId: author.id });
+      const byFormerAuthor = await createAuditLog({ companyId: admin.companyId, userId: formerAuthor.id });
       await createAuditLog({
         companyId: admin.companyId,
         description: "Criou um cargo",
@@ -222,8 +228,146 @@ describe("GET /api/client/audit-logs", () => {
 
       expect(await search("BLOQUEOU")).toEqual([byDescription.id]);
       expect(await search("systemconfig")).toEqual([byEntity.id]);
+      expect(await search("CONFIGURAÇÃO DO SISTEMA")).toEqual([byEntity.id]);
       expect(await search("idleTimeout")).toEqual([byEntityId.id]);
       expect(await search("carla")).toEqual([byAuthor.id]);
+      expect(await search("otávio")).toEqual([byFormerAuthor.id]);
+    });
+
+    it("o rótulo da entidade amplia a busca: `usuário` traz os eventos de `User`, mesmo sem a palavra no texto", async () => {
+      const admin = await createUser();
+      const userEvent = await createAuditLog({
+        companyId: admin.companyId,
+        entity: "User",
+        description: "Entrou no sistema.",
+        createdAt: at("2026-09-01T10:00:00.000Z"),
+      });
+      const roleEvent = await createAuditLog({
+        companyId: admin.companyId,
+        module: "SECURITY",
+        entity: "Role",
+        description: 'Editou o cargo "Suporte".',
+        createdAt: at("2026-09-02T10:00:00.000Z"),
+      });
+      const configEvent = await createAuditLog({
+        companyId: admin.companyId,
+        module: "SETTINGS",
+        entity: "SystemConfig",
+        description: 'Alterou a configuração "Nome da aplicação".',
+        createdAt: at("2026-09-03T10:00:00.000Z"),
+      });
+
+      const search = async (text: string) => listLogs(admin.id, `?search=${encodeURIComponent(text)}`);
+
+      expect(ids(await search("usuário"))).toEqual([userEvent.id]);
+      expect(ids(await search("CARGO"))).toEqual([roleEvent.id]);
+      expect(ids(await search("config"))).toEqual([configEvent.id]);
+      expect((await search("usuário")).json().count).toBe(1);
+    });
+
+    it("só os valores de antes e depois são buscados: o nome de uma chave (ou um valor nulo) não casa", async () => {
+      const admin = await createUser();
+      const byValue = await createAuditLog({
+        companyId: admin.companyId,
+        after: { name: "Equipe de Email Marketing", image: null },
+      });
+      await createAuditLog({
+        companyId: admin.companyId,
+        before: { name: "Ana", email: "ana@example.com", image: null },
+        after: { name: "Ana Paula", email: "ana@example.com", image: null },
+        changedFields: ["name"],
+      });
+
+      const search = async (text: string) => listLogs(admin.id, `?search=${encodeURIComponent(text)}`);
+      const byKey = await search("email");
+
+      expect(ids(byKey)).toEqual([byValue.id]);
+      expect(byKey.json().count).toBe(1);
+      expect(ids(await search("image"))).toEqual([]);
+      expect(ids(await search("null"))).toEqual([]);
+    });
+
+    it("termo curto, sem trigrama (menos de três letras seguidas), dá o mesmo resultado", async () => {
+      const admin = await createUser();
+      const byValue = await createAuditLog({
+        companyId: admin.companyId,
+        after: { name: "Joana" },
+        createdAt: at("2026-09-01T10:00:00.000Z"),
+      });
+      const byDescription = await createAuditLog({
+        companyId: admin.companyId,
+        description: "Ajustou a jornada",
+        createdAt: at("2026-09-02T10:00:00.000Z"),
+      });
+      await createAuditLog({ companyId: admin.companyId, description: "Criou um cargo", after: { name: "Maria" } });
+      await createAuditLog({ companyId: admin.companyId, after: { jobTitle: "Analista" } });
+
+      const shortTerm = await listLogs(admin.id, "?search=JO");
+
+      expect(ids(shortTerm)).toEqual([byDescription.id, byValue.id]);
+      expect(shortTerm.json().count).toBe(2);
+    });
+
+    it("busca nos valores gravados em antes e depois, sem diferenciar maiúsculas, só na própria empresa", async () => {
+      const admin = await createUser({ name: "Admin" });
+      const outsider = await createUser();
+      const renamed = await createAuditLog({
+        companyId: admin.companyId,
+        before: { name: "Joana Prado", email: "joana@example.com" },
+        after: { name: "Joana Prado Lima", email: "joana@example.com" },
+        changedFields: ["name"],
+      });
+      const created = await createAuditLog({
+        companyId: admin.companyId,
+        action: "create",
+        after: { name: "Paulo", phone: "48988887777" },
+      });
+      const deleted = await createAuditLog({
+        companyId: admin.companyId,
+        action: "delete",
+        before: { name: "Ex Funcionário", phone: null },
+      });
+      await createAuditLog({ companyId: admin.companyId, after: { name: "Outra Pessoa" } });
+      await createAuditLog({ companyId: outsider.companyId, after: { name: "Joana Prado", phone: "48988887777" } });
+
+      const search = async (text: string) => ids(await listLogs(admin.id, `?search=${encodeURIComponent(text)}`));
+
+      expect(await search("JOANA PRADO")).toEqual([renamed.id]);
+      expect(await search("prado lima")).toEqual([renamed.id]);
+      expect(await search("88887777")).toEqual([created.id]);
+      expect(await search("ex funcionário")).toEqual([deleted.id]);
+      expect((await listLogs(admin.id, "?search=joana")).json().count).toBe(1);
+    });
+
+    it("o termo é texto literal: `%`, `_` e `\\` não funcionam como curinga", async () => {
+      const admin = await createUser();
+      const percent = await createAuditLog({ companyId: admin.companyId, description: "Desconto de 50% aplicado" });
+      await createAuditLog({ companyId: admin.companyId, description: "Desconto de 500 aplicado" });
+      const underscore = await createAuditLog({ companyId: admin.companyId, entityId: "app_name" });
+      await createAuditLog({ companyId: admin.companyId, entityId: "appXname" });
+      const backslash = await createAuditLog({ companyId: admin.companyId, description: "Caminho C:\\temp" });
+      await createAuditLog({ companyId: admin.companyId, description: "Caminho C:temp" });
+
+      const search = async (text: string) => ids(await listLogs(admin.id, `?search=${encodeURIComponent(text)}`));
+
+      expect(await search("50%")).toEqual([percent.id]);
+      expect(await search("p_n")).toEqual([underscore.id]);
+      expect(await search("C:\\t")).toEqual([backslash.id]);
+    });
+
+    it("busca combinada com filtro: os dois valem juntos", async () => {
+      const admin = await createUser();
+      const match = await createAuditLog({
+        companyId: admin.companyId,
+        module: "SECURITY",
+        after: { roles: "Financeiro" },
+      });
+      await createAuditLog({ companyId: admin.companyId, module: "USERS", after: { name: "Financeiro da Silva" } });
+
+      const response = await listLogs(admin.id, "?search=financeiro&module=SECURITY");
+
+      expect(ids(response)).toEqual([match.id]);
+      expect(response.json().count).toBe(1);
     });
   });
 
@@ -254,7 +398,7 @@ describe("GET /api/client/audit-logs", () => {
   describe("validação", () => {
     it.each([
       ["?module=USERS,BILLING", "module.1", "Módulo de auditoria inválido."],
-      ["?action=export", "action.0", "Ação de auditoria inválida."],
+      ["?action=send", "action.0", "Ação de auditoria inválida."],
       ["?userId=nao-e-uuid", "userId.0", "Identificador inválido."],
       ["?createdFrom=2026-09-01", "createdFrom", "Data e hora inválidas. Use ISO 8601 em UTC."],
       ["?page=-1", "page", expect.any(String)],
