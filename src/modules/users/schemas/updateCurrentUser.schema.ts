@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { imageUrlSchema, nameSchema, phoneSchema } from "@/lib/validation/schemas";
 import { idleTimeoutMinutesBodySchema, userSummarySchema } from "@/modules/users/schemas/user.schemas";
 
@@ -34,7 +35,7 @@ export const updateCurrentUserRouteSchema = {
   summary: "Atualiza o próprio perfil",
   description:
     "Só exige sessão: qualquer usuário autenticado edita o próprio nome, telefone, foto e tempo de inatividade. Não aceita `email`, `isActive`, cargos nem senha (campo fora da lista responde 400). O tempo de inatividade vai no máximo até o da empresa (`security.idleTimeoutMinutes`); acima dele responde 400 com o limite na mensagem. Devolve o usuário no formato da sessão (o mesmo de `GET /users/me`), com as permissões e o `idleTimeoutMinutes` já resolvido.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   body: updateCurrentUserBodySchema,
   response: {
     200: updateCurrentUserResponseSchema,

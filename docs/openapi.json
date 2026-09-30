@@ -11,7 +11,13 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "token",
-        "description": "JWT enviado no cookie HTTP-only `token`. Faça login pelo próprio Swagger para testar as rotas protegidas."
+        "description": "JWT enviado no cookie HTTP-only `token` (a web). Faça login pelo próprio Swagger para testar as rotas protegidas."
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT no cabeçalho `Authorization: Bearer <token>` (o app nativo). O token vem no corpo do login e do register com o cabeçalho `X-Client-Type: mobile`. Com o cabeçalho e o cookie, vale o cabeçalho."
       }
     },
     "schemas": {}
@@ -142,7 +148,7 @@
         "tags": [
           "Session"
         ],
-        "description": "Valida as credenciais, grava o cookie HTTP-only de sessão e devolve o usuário com as permissões efetivas.",
+        "description": "Valida as credenciais e devolve o usuário com as permissões efetivas. Web: grava o cookie HTTP-only de sessão, e o token não sai no corpo. App nativo (`X-Client-Type: mobile`): devolve o token no corpo e não grava o cookie. Rate limit por IP igual nos dois.",
         "requestBody": {
           "required": true,
           "content": {
@@ -172,6 +178,20 @@
             }
           }
         },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            },
+            "in": "header",
+            "name": "x-client-type",
+            "required": false,
+            "description": "Envie `mobile` no app nativo: o token da sessão vem no corpo (`token`) e o cookie não é gravado. A web não envia."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response",
@@ -236,6 +256,10 @@
                         "idleTimeoutMinutes"
                       ],
                       "additionalProperties": false
+                    },
+                    "token": {
+                      "description": "JWT da sessão, só com o cabeçalho `X-Client-Type: mobile`. O app o guarda no armazenamento seguro e o envia em `Authorization: Bearer <token>`. Vale até `SESSION_TTL_HOURS`, sem renovação.",
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -428,7 +452,7 @@
         "tags": [
           "Session"
         ],
-        "description": "Cria a empresa, o cargo `Administrador` dela (catálogo inteiro de permissões) e o usuário vinculado a esse cargo, e grava o cookie de sessão.",
+        "description": "Cria a empresa, o cargo `Administrador` dela (catálogo inteiro de permissões) e o usuário vinculado a esse cargo, e abre a sessão como o login: cookie na web, token no corpo (sem cookie) com `X-Client-Type: mobile`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -464,6 +488,20 @@
             }
           }
         },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            },
+            "in": "header",
+            "name": "x-client-type",
+            "required": false,
+            "description": "Envie `mobile` no app nativo: o token da sessão vem no corpo (`token`) e o cookie não é gravado. A web não envia."
+          }
+        ],
         "responses": {
           "201": {
             "description": "Default Response",
@@ -528,6 +566,10 @@
                         "idleTimeoutMinutes"
                       ],
                       "additionalProperties": false
+                    },
+                    "token": {
+                      "description": "JWT da sessão, só com o cabeçalho `X-Client-Type: mobile`. O app o guarda no armazenamento seguro e o envia em `Authorization: Bearer <token>`. Vale até `SESSION_TTL_HOURS`, sem renovação.",
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -677,7 +719,7 @@
         "tags": [
           "Session"
         ],
-        "description": "Remove o cookie de sessão do cliente.",
+        "description": "Remove o cookie de sessão do cliente. O JWT é sem estado e não é revogado: o app nativo, que usa `Authorization: Bearer`, descarta o token guardado; o token vale até expirar.",
         "responses": {
           "200": {
             "description": "Default Response",
@@ -825,6 +867,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1176,6 +1221,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1488,6 +1536,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1712,6 +1763,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -1928,6 +1982,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -2126,6 +2183,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -2390,6 +2450,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -2779,6 +2842,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -3102,6 +3168,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -3348,6 +3417,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -3729,6 +3801,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -3998,6 +4073,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -4277,6 +4355,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -4478,6 +4559,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -4809,6 +4893,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -5142,6 +5229,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -5363,6 +5453,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -5760,6 +5853,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -6046,6 +6142,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -6325,6 +6424,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -6551,6 +6653,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -6913,6 +7018,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -7172,6 +7280,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -7409,6 +7520,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -7718,6 +7832,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -8137,6 +8254,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "responses": {

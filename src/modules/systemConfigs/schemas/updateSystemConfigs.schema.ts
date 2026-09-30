@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { systemConfigListSchema } from "@/modules/systemConfigs/schemas/systemConfig.schemas";
 import {
   crossKeyRuleMessage,
@@ -94,7 +95,7 @@ export const updateSystemConfigsRouteSchema = {
   summary: "Grava configurações de sistema da empresa em lote",
   description:
     "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Regra entre chaves: `audit.deleteAfterMonths` maior que `audit.anonymizeAfterMonths`, conferida no lote (400 com `issues` no item de `audit.deleteAfterMonths`) e contra o valor já gravado ou o padrão, quando o lote traz só uma das duas (400 só com `message`). Responde a lista completa, como `GET /system-configs`.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   body: updateSystemConfigsBodySchema,
   response: {
     200: updateSystemConfigsResponseSchema,

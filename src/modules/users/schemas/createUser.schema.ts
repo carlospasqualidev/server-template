@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import {
   emailSchema,
   imageUrlSchema,
@@ -37,7 +38,7 @@ export const createUserRouteSchema = {
   tags: ["Users"],
   summary: "Cria um usuário na empresa",
   description: "Exige `backoffice.users.create`. O usuário nasce sem cargo.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   body: createUserBodySchema,
   response: {
     201: createUserResponseSchema,

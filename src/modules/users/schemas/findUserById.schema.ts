@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { userParamsSchema, userSchema } from "@/modules/users/schemas/user.schemas";
 
 export const findUserByIdResponseSchema = z.object({
@@ -11,7 +12,7 @@ export const findUserByIdRouteSchema = {
   tags: ["Users"],
   summary: "Busca um usuário por ID",
   description: "Exige `backoffice.users.read`.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: userParamsSchema,
   response: {
     200: findUserByIdResponseSchema,

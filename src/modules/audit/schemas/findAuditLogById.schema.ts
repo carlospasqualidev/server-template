@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { auditLogDetailSchema, auditLogParamsSchema } from "@/modules/audit/schemas/auditLog.schemas";
 
 export const findAuditLogByIdResponseSchema = z.object({
@@ -12,7 +13,7 @@ export const findAuditLogByIdRouteSchema = {
   summary: "Busca um registro da trilha de auditoria",
   description:
     "Exige `backoffice.audit.read`. Traz o antes, o depois, o autor e o de→para legível (`fieldChanges`: rótulo pt-BR e valores formatados). Registro de outra empresa ou inexistente responde 404.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: auditLogParamsSchema,
   response: {
     200: findAuditLogByIdResponseSchema,

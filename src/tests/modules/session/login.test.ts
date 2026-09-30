@@ -8,6 +8,7 @@ import { withFrozenDate } from "@/tests/helpers/clock";
 import { createRole, createUser, DEFAULT_PASSWORD, findAuditLogs } from "@/tests/helpers/factories";
 
 const LOGIN_URL = "/api/client/session/login";
+const ME_URL = "/api/client/users/me";
 
 describe("POST /api/client/session/login", () => {
   let app: App;
@@ -46,6 +47,107 @@ describe("POST /api/client/session/login", () => {
     const cookie = response.cookies.find((item) => item.name === "token");
     expect(cookie).toMatchObject({ httpOnly: true, path: "/", sameSite: "Lax" });
     expect(cookie?.value).toBeTruthy();
+    expect(response.json()).not.toHaveProperty("token");
+  });
+
+  it("com X-Client-Type: mobile devolve o token no corpo, sem gravar o cookie, e o token abre a sessão por Bearer", async () => {
+    const user = await createUser({ email: "app@example.com", name: "App" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: { "x-client-type": "mobile" },
+      payload: { email: "app@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      success: true,
+      user: {
+        id: user.id,
+        name: "App",
+        email: "app@example.com",
+        image: null,
+        permissions: [...PERMISSION_NAMES].toSorted(),
+        idleTimeoutMinutes: 20,
+      },
+      token: expect.any(String),
+    });
+    expect(response.cookies).toEqual([]);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+
+    const me = await app.inject({
+      method: "GET",
+      url: ME_URL,
+      headers: { authorization: `Bearer ${response.json().token}` },
+    });
+
+    expect(me.statusCode).toBe(200);
+    expect(me.json().user.id).toBe(user.id);
+  });
+
+  it("X-Client-Type com outro valor responde 400, sem abrir sessão", async () => {
+    const user = await createUser({ email: "tipo@example.com" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: { "x-client-type": "Mobile" },
+      payload: { email: "tipo@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      message: 'x-client-type: O cabeçalho X-Client-Type aceita apenas o valor "mobile".',
+      issues: [{ path: "x-client-type", message: 'O cabeçalho X-Client-Type aceita apenas o valor "mobile".' }],
+    });
+    expect(response.cookies).toEqual([]);
+    expect(await findAuditLogs(user.companyId)).toEqual([]);
+  });
+
+  it("login mobile grava o último acesso e o registro de auditoria do login, como na web", async () => {
+    const user = await createUser({ email: "trilha-app@example.com" });
+    const loginAt = new Date("2030-03-10T09:08:07.654Z");
+
+    const response = await withFrozenDate(loginAt, () =>
+      app.inject({
+        method: "POST",
+        url: LOGIN_URL,
+        headers: { "x-client-type": "mobile" },
+        payload: { email: "trilha-app@example.com", password: DEFAULT_PASSWORD },
+      }),
+    );
+
+    expect(response.statusCode).toBe(200);
+
+    const stored = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(stored.lastLoginAt).toEqual(loginAt);
+    expect(await findAuditLogs(user.companyId)).toEqual([
+      expect.objectContaining({ entityId: user.id, action: "login", before: null, after: null, changedFields: [] }),
+    ]);
+  });
+
+  it("login mobile recusado responde como na web, sem token", async () => {
+    await createUser({ email: "recusa-app@example.com" });
+    await createUser({ email: "bloq-app@example.com", isActive: false });
+
+    const wrongPassword = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: { "x-client-type": "mobile" },
+      payload: { email: "recusa-app@example.com", password: "senha-errada" },
+    });
+    const blocked = await app.inject({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: { "x-client-type": "mobile" },
+      payload: { email: "bloq-app@example.com", password: DEFAULT_PASSWORD },
+    });
+
+    expect(wrongPassword.statusCode).toBe(401);
+    expect(wrongPassword.json()).toEqual({ message: "Credenciais inválidas." });
+    expect(blocked.statusCode).toBe(403);
+    expect(blocked.json()).toEqual({ message: "Sua conta está bloqueada." });
   });
 
   it("grava o último acesso em UTC junto do registro de auditoria do login, sem mexer no updatedAt", async () => {
@@ -243,6 +345,32 @@ describe("POST /api/client/session/login", () => {
 
       expect(third.statusCode).toBe(429);
       expect(third.json()).toEqual({ message: "Muitas tentativas. Aguarde um instante e tente novamente." });
+    } finally {
+      await limitedApp.close();
+    }
+  });
+
+  it("o limite de tentativas conta a web e o app juntos", async () => {
+    const limitedApp = await createTestApp({ loginRateLimitMax: 2 });
+
+    try {
+      const attempt = (headers: Record<string, string>) =>
+        limitedApp.inject({
+          method: "POST",
+          url: LOGIN_URL,
+          headers,
+          payload: { email: "x@example.com", password: "12345678" },
+        });
+
+      const web = await attempt({});
+      const mobile = await attempt({ "x-client-type": "mobile" });
+      const thirdMobile = await attempt({ "x-client-type": "mobile" });
+      const thirdWeb = await attempt({});
+
+      expect([web.statusCode, mobile.statusCode]).toEqual([401, 401]);
+      expect(thirdMobile.statusCode).toBe(429);
+      expect(thirdWeb.statusCode).toBe(429);
+      expect(thirdMobile.json()).toEqual({ message: "Muitas tentativas. Aguarde um instante e tente novamente." });
     } finally {
       await limitedApp.close();
     }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema, messageResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { passwordSchema, passwordsMatch, passwordsMatchIssue } from "@/lib/validation/schemas";
 
 export const changeCurrentUserPasswordBodySchema = z
@@ -25,7 +26,7 @@ export const changeCurrentUserPasswordRouteSchema = {
   summary: "Troca a própria senha",
   description:
     "Só exige sessão. Confere a senha atual (errada responde 400 `Senha atual incorreta.`); a nova segue as regras de senha, precisa ser igual à confirmação e diferente da atual. Se a senha mudar por outro caminho entre a conferência e a gravação, responde 409 e mantém a que foi gravada. Mesmo limite de tentativas do login (429). As sessões abertas continuam válidas: o JWT não é revogado.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   body: changeCurrentUserPasswordBodySchema,
   response: {
     200: messageResponseSchema,

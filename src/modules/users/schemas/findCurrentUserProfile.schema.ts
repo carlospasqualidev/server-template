@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { userSchema } from "@/modules/users/schemas/user.schemas";
 
 /**
@@ -24,6 +25,6 @@ export const findCurrentUserProfileRouteSchema = {
   summary: "Perfil do próprio usuário",
   description:
     "Só exige sessão. Devolve o que `PATCH /users/me` edita, com os valores gravados, para pré-preencher o formulário de perfil. Aqui `idleTimeoutMinutes` é o próprio do usuário (`null` quando herda o da empresa); na sessão (`GET /users/me`) ele sai já resolvido.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   response: { 200: findCurrentUserProfileResponseSchema, 401: errorResponseSchema, 403: errorResponseSchema },
 };

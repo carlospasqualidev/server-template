@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { MAX_BODY_IDS } from "@/config/constants";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { idSchema } from "@/lib/validation/schemas";
 import { roleSummarySchema } from "@/modules/roles/schemas/role.schemas";
 import { userParamsSchema, userSchema } from "@/modules/users/schemas/user.schemas";
@@ -29,7 +30,7 @@ export const setUserRolesRouteSchema = {
   summary: "Define os cargos de um usuário",
   description:
     "Exige `backoffice.users.update`. Substitui os cargos do usuário. Alterar os próprios cargos ou retirar o cargo `Administrador` do último administrador ativo da empresa responde 400; atribuir cargo com permissão que o autor não possui, ou atribuir ou retirar o `Administrador` sem ser Administrador, 403; usuário ou cargo de outra empresa (ou excluído), 404.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: userParamsSchema,
   body: setUserRolesBodySchema,
   response: {

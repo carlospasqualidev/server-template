@@ -1,6 +1,12 @@
 /** Nome do cookie HTTP-only que carrega o JWT da sessão. */
 export const SESSION_COOKIE_NAME = "token";
 
+/**
+ * Valor do cabeçalho `X-Client-Type` que identifica o app nativo (app-template): com ele, login e register devolvem o
+ * JWT da sessão no corpo e não gravam o cookie. Sem o cabeçalho (a web), só o cookie. É o único valor aceito.
+ */
+export const MOBILE_CLIENT_TYPE = "mobile";
+
 export const PASSWORD_MIN_LENGTH = 8;
 
 /** Paginação padrão das listagens (alinhada à DataTable do frontend). */

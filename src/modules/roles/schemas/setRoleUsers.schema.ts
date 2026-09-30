@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { MAX_BODY_IDS } from "@/config/constants";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { idSchema } from "@/lib/validation/schemas";
 import { roleParamsSchema, saveRoleResponseSchema } from "@/modules/roles/schemas/role.schemas";
 
@@ -21,7 +22,7 @@ export const setRoleUsersRouteSchema = {
   summary: "Define os usuários de um cargo",
   description:
     "Exige `backoffice.roles.update` e `backoffice.users.update`. Substitui o conjunto de usuários do cargo. Incluir ou retirar a si mesmo responde 400; o cargo de sistema não muda por aqui (400: use os cargos de cada usuário). Incluir alguém num cargo com permissão que o autor não possui responde 403. Usuário de outra empresa responde 404.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: roleParamsSchema,
   body: setRoleUsersBodySchema,
   response: {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { roleParamsSchema, roleSchema } from "@/modules/roles/schemas/role.schemas";
 
 export const findRoleByIdResponseSchema = z.object({
@@ -11,7 +12,7 @@ export const findRoleByIdRouteSchema = {
   tags: ["Roles"],
   summary: "Busca um cargo por ID, com as permissões",
   description: "Exige `backoffice.roles.read`.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: roleParamsSchema,
   response: {
     200: findRoleByIdResponseSchema,

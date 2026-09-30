@@ -2,7 +2,7 @@ import { type FastifyDynamicSwaggerOptions } from "@fastify/swagger";
 import { type FastifySwaggerUiOptions } from "@fastify/swagger-ui";
 import { jsonSchemaTransform, jsonSchemaTransformObject } from "fastify-type-provider-zod";
 
-import { SESSION_COOKIE_NAME } from "@/config/constants";
+import { MOBILE_CLIENT_TYPE, SESSION_COOKIE_NAME } from "@/config/constants";
 import { env } from "@/config/env";
 
 /** Toda tag usada em `tags:` de um schema de rota precisa estar registrada aqui, com descrição. */
@@ -39,7 +39,13 @@ export const swaggerOptions: FastifyDynamicSwaggerOptions = {
           type: "apiKey",
           in: "cookie",
           name: SESSION_COOKIE_NAME,
-          description: `JWT enviado no cookie HTTP-only \`${SESSION_COOKIE_NAME}\`. Faça login pelo próprio Swagger para testar as rotas protegidas.`,
+          description: `JWT enviado no cookie HTTP-only \`${SESSION_COOKIE_NAME}\` (a web). Faça login pelo próprio Swagger para testar as rotas protegidas.`,
+        },
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: `JWT no cabeçalho \`Authorization: Bearer <token>\` (o app nativo). O token vem no corpo do login e do register com o cabeçalho \`X-Client-Type: ${MOBILE_CLIENT_TYPE}\`. Com o cabeçalho e o cookie, vale o cabeçalho.`,
         },
       },
     },

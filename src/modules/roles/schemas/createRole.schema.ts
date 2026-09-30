@@ -1,4 +1,5 @@
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { saveRoleBodySchema, saveRoleResponseSchema } from "@/modules/roles/schemas/role.schemas";
 
 export const createRoleRouteSchema = {
@@ -6,7 +7,7 @@ export const createRoleRouteSchema = {
   summary: "Cria um cargo na empresa",
   description:
     "Exige `backoffice.roles.create`. Nome repetido na empresa, inclusive de cargo excluído, responde 409; permissão inexistente, 400; permissão que o autor não possui (contando o `read` incluído pela expansão), 403.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   body: saveRoleBodySchema,
   response: {
     201: saveRoleResponseSchema,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { paginationQuerySchema, sortQuerySchema } from "@/lib/http/pagination";
 import { searchQuerySchema } from "@/lib/http/query";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { roleParamsSchema } from "@/modules/roles/schemas/role.schemas";
 
 /** Allowlist de ordenação: só estes campos chegam ao `orderBy` do Prisma. */
@@ -34,7 +35,7 @@ export const listRoleUsersRouteSchema = {
   summary: "Lista os usuários de um cargo",
   description:
     "Exige `backoffice.roles.read` e `backoffice.users.read` (expõe nome e e-mail). Paginação 0-based, ordenação por allowlist e busca. Usuários bloqueados aparecem; excluídos, não.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: roleParamsSchema,
   querystring: listRoleUsersQuerySchema,
   response: {

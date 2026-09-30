@@ -1,14 +1,16 @@
 import { type FastifyReply, type FastifyRequest } from "fastify";
 
-import { SESSION_COOKIE_NAME } from "@/config/constants";
-import { sessionCookieOptions, signSessionToken } from "@/lib/auth/session";
+import { openSession } from "@/lib/auth/session";
 import { type LoginBody } from "@/modules/session/schemas/login.schema";
+import { type SessionClientHeaders } from "@/modules/session/schemas/session.schemas";
 import { authenticateUserService } from "@/modules/session/services/authenticateUser.service";
 
-export async function loginController(request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) {
+export async function loginController(
+  request: FastifyRequest<{ Body: LoginBody; Headers: SessionClientHeaders }>,
+  reply: FastifyReply,
+) {
   const user = await authenticateUserService(request.body);
+  const session = openSession(reply, user.id, request.headers["x-client-type"]);
 
-  reply.setCookie(SESSION_COOKIE_NAME, signSessionToken(user.id), sessionCookieOptions);
-
-  return reply.status(200).send({ success: true, user });
+  return reply.status(200).send({ success: true, user, ...session });
 }

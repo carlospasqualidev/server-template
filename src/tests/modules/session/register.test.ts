@@ -42,10 +42,59 @@ describe("POST /api/client/session/register", () => {
       },
     });
     expect(response.cookies.find((cookie) => cookie.name === "token")?.value).toBeTruthy();
+    expect(response.json()).not.toHaveProperty("token");
 
     const created = await prisma.user.findUnique({ where: { email: "carla@example.com" }, include: { company: true } });
     expect(created?.company.name).toBe("Empresa de Carla");
     expect(created?.password).not.toBe("senha-forte-1");
+  });
+
+  it("com X-Client-Type: mobile devolve o token no corpo, sem gravar o cookie, e grava o primeiro acesso", async () => {
+    const registeredAt = new Date("2030-04-01T11:12:13.141Z");
+
+    const response = await withFrozenDate(registeredAt, () =>
+      app.inject({
+        method: "POST",
+        url: REGISTER_URL,
+        headers: { "x-client-type": "mobile" },
+        payload: { name: "Nina", email: "nina@example.com", password: "senha-forte-1" },
+      }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({
+      success: true,
+      user: expect.objectContaining({ name: "Nina", email: "nina@example.com" }),
+      token: expect.any(String),
+    });
+    expect(response.cookies).toEqual([]);
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: "nina@example.com" } });
+    expect(user.lastLoginAt).toEqual(registeredAt);
+
+    const me = await app.inject({
+      method: "GET",
+      url: "/api/client/users/me",
+      headers: { authorization: `Bearer ${response.json().token}` },
+    });
+
+    expect(me.statusCode).toBe(200);
+    expect(me.json().user.id).toBe(user.id);
+  });
+
+  it("X-Client-Type com outro valor responde 400 sem criar a conta", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: REGISTER_URL,
+      headers: { "x-client-type": "web" },
+      payload: { name: "Olga", email: "olga@example.com", password: "senha-forte-1" },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues).toEqual([
+      { path: "x-client-type", message: 'O cabeçalho X-Client-Type aceita apenas o valor "mobile".' },
+    ]);
+    expect(await prisma.user.findUnique({ where: { email: "olga@example.com" } })).toBeNull();
   });
 
   it("grava o primeiro acesso em UTC, fora do registro de auditoria da criação", async () => {

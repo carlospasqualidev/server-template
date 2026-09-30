@@ -4,6 +4,7 @@ import { AuditAction, AuditModule } from "@/generated/prisma/client";
 import { paginationQuerySchema, sortQuerySchema } from "@/lib/http/pagination";
 import { csvQuerySchema, dateTimeQuerySchema, searchQuerySchema } from "@/lib/http/query";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { idSchema } from "@/lib/validation/schemas";
 import { auditLogListItemSchema } from "@/modules/audit/schemas/auditLog.schemas";
 
@@ -49,7 +50,7 @@ export const listAuditLogsRouteSchema = {
   summary: "Lista a trilha de auditoria da empresa",
   description:
     "Exige `backoffice.audit.read`. Paginação 0-based, filtros múltiplos por vírgula, período inclusivo, busca por conteúdo (inclusive nos valores de antes e depois) e ordenação por allowlist (padrão `createdAt desc`). Só registros da empresa do usuário autenticado.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   querystring: listAuditLogsQuerySchema,
   response: {
     200: listAuditLogsResponseSchema,

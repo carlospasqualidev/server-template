@@ -1,4 +1,5 @@
 import { errorResponseSchema, messageResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { userParamsSchema } from "@/modules/users/schemas/user.schemas";
 
 export const deleteUserRouteSchema = {
@@ -6,7 +7,7 @@ export const deleteUserRouteSchema = {
   summary: "Exclui um usuário (exclusão lógica)",
   description:
     "Exige `backoffice.users.delete`. Excluir o próprio usuário ou o último administrador ativo da empresa responde 400.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: userParamsSchema,
   response: {
     200: messageResponseSchema,

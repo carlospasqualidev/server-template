@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { paginationQuerySchema } from "@/lib/http/pagination";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { AUDIT_ENTITIES } from "@/modules/audit/audit.catalog";
 import { auditLogTimelineItemSchema } from "@/modules/audit/schemas/auditLog.schemas";
 
@@ -35,7 +36,7 @@ export const listAuditLogsByEntityRouteSchema = {
   summary: "Linha do tempo de um registro na trilha de auditoria",
   description:
     "Exige `backoffice.audit.read`. Tudo o que aconteceu com um registro (um usuário, um cargo, uma configuração), mais recente primeiro (`createdAt desc`, desempate por `id`), paginado 0-based, cada evento com autor, ação, descrição e o de→para legível (`fieldChanges`). Só eventos da empresa do usuário autenticado: registro de outra empresa ou inexistente devolve a lista vazia.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: listAuditLogsByEntityParamsSchema,
   querystring: listAuditLogsByEntityQuerySchema,
   response: {

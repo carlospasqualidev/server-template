@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { userSummarySchema } from "@/modules/users/schemas/user.schemas";
 
 export const findCurrentUserResponseSchema = z.object({
@@ -12,6 +13,6 @@ export const findCurrentUserRouteSchema = {
   summary: "Usuário da sessão atual",
   description:
     "Valida a sessão e devolve o usuário autenticado com as permissões efetivas. Só exige sessão. O frontend chama ao carregar.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   response: { 200: findCurrentUserResponseSchema, 401: errorResponseSchema, 403: errorResponseSchema },
 };

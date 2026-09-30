@@ -41,7 +41,11 @@ describe("GET /health", () => {
 
     expect(response.statusCode).toBe(200);
     expect(document.paths["/api/client/session/login"].post.tags).toEqual(["Session"]);
-    expect(document.paths["/api/client/users"].get.security).toEqual([{ cookieAuth: [] }]);
+    expect(document.paths["/api/client/users"].get.security).toEqual([{ cookieAuth: [] }, { bearerAuth: [] }]);
+    expect(document.components.securitySchemes.bearerAuth).toMatchObject({ type: "http", scheme: "bearer" });
+    expect(document.paths["/api/client/session/login"].post.parameters).toContainEqual(
+      expect.objectContaining({ in: "header", name: "x-client-type", schema: { type: "string", enum: ["mobile"] } }),
+    );
     expect(document.paths["/api/client/users/{userId}"].get.parameters[0].schema.format).toBe("uuid");
     expect(document.paths["/api/client/upload/file"].post.requestBody.content["multipart/form-data"]).toBeDefined();
   });

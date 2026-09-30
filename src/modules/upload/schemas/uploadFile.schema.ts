@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 
 /** Só documenta o formulário no Swagger: multipart não passa pela validação Zod (ver `upload.routes.ts`). */
 export const uploadFileBodySchema = z.object({
@@ -20,7 +21,7 @@ export const uploadFileRouteSchema = {
   tags: ["Upload"],
   summary: "Envia um arquivo para o storage",
   description: "Recebe um arquivo via multipart/form-data no campo `file` e devolve a URL pública.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   consumes: ["multipart/form-data"],
   body: uploadFileBodySchema,
   response: {

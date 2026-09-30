@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 
 const catalogPermissionSchema = z.object({
   id: z.string().describe("ID da permissão (o que `permissionIds` recebe)."),
@@ -29,7 +30,7 @@ export const listPermissionCatalogRouteSchema = {
   summary: "Catálogo de permissões, agrupado para a tela de cargos",
   description:
     "Exige `backoffice.roles.read`. Árvore módulo → grupo → permissões, em ordem de exibição (`sortOrder`). O catálogo é global: igual para toda empresa.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   response: {
     200: listPermissionCatalogResponseSchema,
     401: errorResponseSchema,

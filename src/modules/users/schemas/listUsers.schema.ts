@@ -3,6 +3,7 @@ import { z } from "zod";
 import { paginationQuerySchema, sortQuerySchema } from "@/lib/http/pagination";
 import { booleanQuerySchema, csvQuerySchema, dateTimeQuerySchema, searchQuerySchema } from "@/lib/http/query";
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import { idSchema } from "@/lib/validation/schemas";
 import { userSchema } from "@/modules/users/schemas/user.schemas";
 
@@ -36,7 +37,7 @@ export const listUsersRouteSchema = {
   summary: "Lista os usuários da empresa",
   description:
     "Paginação 0-based, ordenação por allowlist (padrão `name asc`; `lastLoginAt` deixa quem nunca acessou no fim nos dois sentidos; `isActive` em `asc` traz os bloqueados antes dos ativos) e filtros, inclusive o período de cadastro (`createdFrom`/`createdTo`, inclusivos). Só usuários da empresa do usuário autenticado, com os cargos de cada um. Exige `backoffice.users.read`.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   querystring: listUsersQuerySchema,
   response: {
     200: listUsersResponseSchema,

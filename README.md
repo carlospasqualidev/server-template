@@ -9,7 +9,7 @@ As convenções para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](
 - Node 22+ (ESM), TypeScript strict
 - Fastify 5 com `fastify-type-provider-zod`: um schema Zod por endpoint gera validação, tipos, serialização e OpenAPI
 - Prisma 7 sobre PostgreSQL (driver adapter `pg`)
-- Sessão: JWT em cookie HTTP-only (`token`), bcrypt para senha, rate limit no login e na troca da própria senha
+- Sessão: JWT em cookie HTTP-only (`token`) para a web, ou em `Authorization: Bearer` para o app nativo, bcrypt para senha, rate limit no login e na troca da própria senha
 - Upload: streaming para AWS S3 (`@aws-sdk/lib-storage`)
 - Logs: pino (pretty em dev, JSON em produção)
 - Testes: Vitest + `app.inject()` contra o banco `server_template_test`
@@ -84,13 +84,13 @@ Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
 ## Rotas atuais
 
-Prefixo `/api/client`. Rotas protegidas exigem o cookie `token`; as que têm permissão respondem 403 sem ela.
+Prefixo `/api/client`. Rotas protegidas exigem o cookie `token` (web) ou o cabeçalho `Authorization: Bearer <token>` (app nativo; com os dois, vale o cabeçalho); as que têm permissão respondem 403 sem ela.
 
 | Método   | Rota                                     | Protegida | Permissão                                             | Descrição                                                                                                          |
 | -------- | ---------------------------------------- | --------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `POST`   | `/session/login`                         | não       |                                                       | Autentica e grava o cookie                                                                                         |
+| `POST`   | `/session/login`                         | não       |                                                       | Autentica e grava o cookie (com `X-Client-Type: mobile`, devolve o `token` no corpo, sem cookie)                   |
 | `POST`   | `/session/register`                      | não       |                                                       | Cria empresa, cargo Administrador e usuário, e inicia a sessão                                                     |
-| `POST`   | `/session/logout`                        | não       |                                                       | Limpa o cookie                                                                                                     |
+| `POST`   | `/session/logout`                        | não       |                                                       | Limpa o cookie (o token Bearer não é revogado: o app o descarta)                                                   |
 | `GET`    | `/users/me`                              | sim       |                                                       | Usuário da sessão, com `permissions` e `idleTimeoutMinutes`                                                        |
 | `GET`    | `/users/me/profile`                      | sim       |                                                       | Perfil gravado do próprio usuário (tempo de inatividade próprio, não o resolvido)                                  |
 | `PATCH`  | `/users/me`                              | sim       |                                                       | Edita o próprio perfil (nome, telefone, foto, tempo de inatividade)                                                |
@@ -128,13 +128,15 @@ Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do ca
 
 ## Sessão e timeout de inatividade
 
-Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar; o próprio usuário, em `PATCH /users/me`, só até o da empresa), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie vale até `SESSION_TTL_HOURS`).
+Login, register e `GET /users/me` devolvem `user = { id, name, email, image, permissions, idleTimeoutMinutes }`. `idleTimeoutMinutes` chega já resolvido: o tempo do cadastro do usuário (`POST /users` e `PATCH /users/:userId` aceitam de 1 a 480, ou `null` para herdar; o próprio usuário, em `PATCH /users/me`, só até o da empresa), senão a configuração `security.idleTimeoutMinutes` da empresa, senão 20. Quem encerra a sessão por inatividade é o cliente; o servidor não impõe o tempo (o cookie ou o token vale até `SESSION_TTL_HOURS`).
+
+O mesmo JWT chega ao cliente de dois jeitos. A web não manda nada de especial: login e register gravam o cookie HTTP-only e respondem `{ success, user }`, sem o token. O app nativo manda o cabeçalho `X-Client-Type: mobile` (único valor aceito; outro responde 400): a resposta traz também `token`, e o cookie não é gravado, para a credencial ficar só no armazenamento seguro do aparelho (o pote de cookies do sistema guardaria uma cópia fora dele, que ainda abriria a sessão depois do logout). O app envia o token em `Authorization: Bearer <token>`; com o cabeçalho e o cookie na mesma requisição, vale o cabeçalho. Não há refresh nem revogação: o token vale até `SESSION_TTL_HOURS`, e no logout o app o apaga. Rate limit, registro `login` na auditoria e `lastLoginAt` são iguais nos dois modos.
 
 ## Usuários
 
 O usuário do CRUD (`/users`) traz, além do cadastro, os cargos que valem (`roles: [{ id, name }]`, por nome) e o último acesso (`lastLoginAt`, `null` para quem nunca acessou), gravado a cada abertura de sessão (login bem-sucedido ou register) junto do registro de auditoria, sem mexer no `updatedAt`, que reflete só edição de cadastro. Não há campo de status: ativo ou bloqueado é `isActive`. A lista filtra por cargo (`roleId=<id>,<id>`, qualquer um deles) e por período de cadastro (`createdFrom`/`createdTo`, ISO 8601 UTC, inclusivos), e ordena por último acesso, com quem nunca acessou no fim, ou por status (`orderBy=isActive`: no `asc` os bloqueados vêm antes dos ativos).
 
-Qualquer usuário logado, sem permissão de administrar usuários, lê o próprio perfil em `GET /users/me/profile` (os valores gravados: ali o tempo de inatividade é o próprio, `null` quando herda o da empresa, e não o resolvido da sessão), edita-o em `PATCH /users/me` (nome, telefone, foto `https` e tempo de inatividade até o da empresa; e-mail, status e cargos não mudam por aqui) e troca a própria senha em `PUT /users/me/password`, informando a senha atual (se a senha mudar por outro caminho no meio da troca, responde 409 e nada é gravado). As duas mudanças entram na trilha de auditoria com o próprio usuário como autor (a senha só como campo alterado, sem valor). A troca de senha não encerra as sessões abertas: sem tabela de sessões, o cookie já emitido vale até expirar (`SESSION_TTL_HOURS`). Contrato completo: [`CLAUDE.md`](CLAUDE.md#contrato-com-os-clientes-frontend-web-e-app).
+Qualquer usuário logado, sem permissão de administrar usuários, lê o próprio perfil em `GET /users/me/profile` (os valores gravados: ali o tempo de inatividade é o próprio, `null` quando herda o da empresa, e não o resolvido da sessão), edita-o em `PATCH /users/me` (nome, telefone, foto `https` e tempo de inatividade até o da empresa; e-mail, status e cargos não mudam por aqui) e troca a própria senha em `PUT /users/me/password`, informando a senha atual (se a senha mudar por outro caminho no meio da troca, responde 409 e nada é gravado). As duas mudanças entram na trilha de auditoria com o próprio usuário como autor (a senha só como campo alterado, sem valor). A troca de senha não encerra as sessões abertas: sem tabela de sessões, o cookie ou o token já emitido vale até expirar (`SESSION_TTL_HOURS`). Contrato completo: [`CLAUDE.md`](CLAUDE.md#contrato-com-os-clientes-frontend-web-e-app).
 
 ## Configurações de sistema
 
@@ -201,3 +203,4 @@ O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e crede
 1. Abra `http://localhost:8080/docs`.
 2. Em **Session**, execute `POST /api/client/session/login` com `admin@admin.com` / `123123123`.
 3. O cookie fica no navegador; as rotas de **Users** e **Upload** passam a funcionar na mesma aba.
+4. Para testar como o app nativo: faça o login com o cabeçalho `x-client-type` = `mobile`, copie o `token` da resposta e cole em **Authorize → bearerAuth**.

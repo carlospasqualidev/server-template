@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 import {
   imageUrlSchema,
   nameSchema,
@@ -38,7 +39,7 @@ export const updateUserRouteSchema = {
   summary: "Atualiza um usuário",
   description:
     "Exige `backoffice.users.update`. Bloquear (`isActive: false`) o último administrador ativo da empresa responde 400.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   params: userParamsSchema,
   body: updateUserBodySchema,
   response: {

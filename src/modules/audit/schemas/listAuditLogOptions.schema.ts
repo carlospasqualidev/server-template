@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
+import { sessionSecurity } from "@/lib/http/security";
 
 const auditLogOptionSchema = z.object({
   value: z.string().describe("Valor gravado no registro e aceito no filtro."),
@@ -18,7 +19,7 @@ export const listAuditLogOptionsRouteSchema = {
   summary: "Opções dos filtros da trilha de auditoria",
   description:
     "Exige `backoffice.audit.read`. Módulos, ações e entidades com o rótulo pt-BR, mantidos no backend: entidade nova auditada aparece sem mudar o frontend.",
-  security: [{ cookieAuth: [] }],
+  security: sessionSecurity,
   response: {
     200: listAuditLogOptionsResponseSchema,
     401: errorResponseSchema,
