@@ -5601,6 +5601,8 @@
                               "app.name",
                               "app.supportEmail",
                               "security.idleTimeoutMinutes",
+                              "audit.anonymizeAfterMonths",
+                              "audit.deleteAfterMonths",
                               "notifications.email"
                             ],
                             "description": "Chave estável, `<grupo>.<nome>`: é o que o `PATCH` recebe."
@@ -5752,7 +5754,7 @@
         "tags": [
           "SystemConfigs"
         ],
-        "description": "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Responde a lista completa, como `GET /system-configs`.",
+        "description": "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Regra entre chaves: `audit.deleteAfterMonths` maior que `audit.anonymizeAfterMonths`, conferida no lote (400 com `issues` no item de `audit.deleteAfterMonths`) e contra o valor já gravado ou o padrão, quando o lote traz só uma das duas (400 só com `message`). Responde a lista completa, como `GET /system-configs`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -5762,7 +5764,7 @@
                 "properties": {
                   "items": {
                     "minItems": 1,
-                    "maxItems": 4,
+                    "maxItems": 6,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -5773,6 +5775,8 @@
                             "app.name",
                             "app.supportEmail",
                             "security.idleTimeoutMinutes",
+                            "audit.anonymizeAfterMonths",
+                            "audit.deleteAfterMonths",
                             "notifications.email"
                           ],
                           "description": "Chave da configuração (a de `GET /system-configs`).",
@@ -5789,7 +5793,7 @@
                         "value"
                       ]
                     },
-                    "description": "Configurações alteradas, cada chave uma vez. Todas são gravadas, ou nenhuma."
+                    "description": "Configurações alteradas, cada chave uma vez. Todas são gravadas, ou nenhuma. Regras entre chaves (o prazo para apagar a auditoria maior que o para anonimizar) valem sobre o resultado: o valor do lote, senão o gravado, senão o padrão."
                   }
                 },
                 "required": [
@@ -5826,6 +5830,8 @@
                               "app.name",
                               "app.supportEmail",
                               "security.idleTimeoutMinutes",
+                              "audit.anonymizeAfterMonths",
+                              "audit.deleteAfterMonths",
                               "notifications.email"
                             ],
                             "description": "Chave estável, `<grupo>.<nome>`: é o que o `PATCH` recebe."
@@ -6215,7 +6221,7 @@
                             "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
                           },
                           "description": {
-                            "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
+                            "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha. Evento anonimizado pela retenção traz a frase genérica, sem nome (`Editou um usuário.`).",
                             "type": [
                               "string",
                               "null"
@@ -6230,7 +6236,7 @@
                             "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."
                           },
                           "userId": {
-                            "description": "Autor da ação; null quando foi o sistema.",
+                            "description": "Autor da ação; null quando foi o sistema ou quando o evento foi anonimizado.",
                             "type": [
                               "string",
                               "null"
@@ -6241,7 +6247,7 @@
                             "format": "date-time"
                           },
                           "userName": {
-                            "description": "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema.",
+                            "description": "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema ou o evento foi anonimizado.",
                             "type": [
                               "string",
                               "null"
@@ -6711,7 +6717,7 @@
                             "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
                           },
                           "description": {
-                            "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
+                            "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha. Evento anonimizado pela retenção traz a frase genérica, sem nome (`Editou um usuário.`).",
                             "type": [
                               "string",
                               "null"
@@ -6726,7 +6732,7 @@
                             "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."
                           },
                           "userId": {
-                            "description": "Autor da ação; null quando foi o sistema.",
+                            "description": "Autor da ação; null quando foi o sistema ou quando o evento foi anonimizado.",
                             "type": [
                               "string",
                               "null"
@@ -6737,7 +6743,7 @@
                             "format": "date-time"
                           },
                           "userName": {
-                            "description": "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema.",
+                            "description": "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema ou o evento foi anonimizado.",
                             "type": [
                               "string",
                               "null"
@@ -7018,7 +7024,7 @@
                           "description": "Ação registrada. Rótulos em `GET /audit-logs/options`."
                         },
                         "description": {
-                          "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
+                          "description": "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha. Evento anonimizado pela retenção traz a frase genérica, sem nome (`Editou um usuário.`).",
                           "type": [
                             "string",
                             "null"
@@ -7033,7 +7039,7 @@
                           "description": "Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."
                         },
                         "userId": {
-                          "description": "Autor da ação; null quando foi o sistema.",
+                          "description": "Autor da ação; null quando foi o sistema ou quando o evento foi anonimizado.",
                           "type": [
                             "string",
                             "null"
@@ -7063,7 +7069,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`."
+                          "description": "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`, e os dados pessoais também, depois que a retenção anonimiza o evento."
                         },
                         "after": {
                           "anyOf": [
@@ -7116,7 +7122,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema."
+                          "description": "Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema ou o evento foi anonimizado."
                         },
                         "fieldChanges": {
                           "type": "array",

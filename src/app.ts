@@ -33,7 +33,16 @@ const applyHelmetHeaders = helmetMiddleware();
  * projeto, em pt-BR e sem repetir o caminho.
  */
 function frameworkErrorHandler(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
-  applyHelmetHeaders(request.raw, reply.raw, () => undefined);
+  // Sem opções o helmet não falha; se um dia falhar (opção nova inválida), a resposta de erro sai assim mesmo, sem
+  // os cabeçalhos que faltaram, e a falha fica no log.
+  applyHelmetHeaders(request.raw, reply.raw, (helmetError) => {
+    if (helmetError) {
+      request.log.warn(
+        { err: helmetError },
+        "Falha ao aplicar os cabeçalhos do helmet na resposta de erro do roteador",
+      );
+    }
+  });
   reply.headers(corsHeadersFor(request.headers.origin));
 
   return errorHandler(error, request, reply);

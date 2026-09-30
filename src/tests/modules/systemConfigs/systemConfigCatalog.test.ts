@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { SYSTEM_CONFIG_CATALOG, SYSTEM_CONFIG_KEYS } from "@/modules/systemConfigs/systemConfig.catalog";
+import {
+  crossKeyRuleMessage,
+  SYSTEM_CONFIG_CATALOG,
+  SYSTEM_CONFIG_CROSS_KEY_RULES,
+  SYSTEM_CONFIG_KEYS,
+  systemConfigValueReader,
+} from "@/modules/systemConfigs/systemConfig.catalog";
 import {
   parseSystemConfigValue,
   resolveSystemConfigValue,
@@ -40,6 +46,8 @@ describe("SYSTEM_CONFIG_CATALOG", () => {
       "app.name",
       "app.supportEmail",
       "security.idleTimeoutMinutes",
+      "audit.anonymizeAfterMonths",
+      "audit.deleteAfterMonths",
       "notifications.email",
     ]);
   });
@@ -69,6 +77,33 @@ describe("SYSTEM_CONFIG_CATALOG", () => {
       expect(parsed.success, definition.key).toBe(true);
       expect(parsed.data).toEqual(definition.defaultValue);
     }
+  });
+
+  it("os padrões passam por todas as regras entre chaves, e cada regra aponta para uma das próprias chaves", () => {
+    const defaults = systemConfigValueReader(new Map());
+
+    for (const rule of SYSTEM_CONFIG_CROSS_KEY_RULES) {
+      expect(rule.keys, rule.message).toContain(rule.reportOn);
+      expect(rule.isSatisfied(defaults), rule.message).toBe(true);
+    }
+  });
+
+  it("prazo para apagar a auditoria maior que o para anonimizar", () => {
+    const [rule] = SYSTEM_CONFIG_CROSS_KEY_RULES;
+    const reader = (anonymize: string, remove: string) =>
+      systemConfigValueReader(
+        new Map([
+          ["audit.anonymizeAfterMonths", anonymize],
+          ["audit.deleteAfterMonths", remove],
+        ]),
+      );
+
+    expect(rule?.isSatisfied(reader("12", "13"))).toBe(true);
+    expect(rule?.isSatisfied(reader("12", "12"))).toBe(false);
+    expect(rule?.isSatisfied(reader("24", "12"))).toBe(false);
+    expect(rule && crossKeyRuleMessage(rule)).toBe(
+      "Prazo para apagar a auditoria (meses): Informe um valor maior que o prazo para anonimizar.",
+    );
   });
 });
 

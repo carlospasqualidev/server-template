@@ -28,6 +28,7 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "openapi:export": "tsx scripts/exportOpenApi.ts",
+    "audit:retention": "node --env-file-if-exists=.env --import tsx src/scripts/runAuditRetention.ts",
     "clean": "node -e \"const{rmSync}=require('node:fs');for(const p of ['dist','coverage','src/generated']){rmSync(p,{recursive:true,force:true});console.log('removed',p);}\"",
     "postinstall": "prisma generate",
     "prepare": "husky"

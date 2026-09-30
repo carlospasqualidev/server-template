@@ -36,6 +36,24 @@ const DEFAULT_SYSTEM_CONFIGS = [
     value: "20",
   },
   {
+    key: "audit.anonymizeAfterMonths",
+    module: "SECURITY",
+    label: "Prazo para anonimizar a auditoria (meses)",
+    description:
+      "Meses até cada evento da auditoria perder o autor, o IP, o navegador e os dados pessoais registrados. O que foi feito continua no histórico.",
+    valueType: "int",
+    value: "12",
+  },
+  {
+    key: "audit.deleteAfterMonths",
+    module: "SECURITY",
+    label: "Prazo para apagar a auditoria (meses)",
+    description:
+      "Meses até cada evento da auditoria ser apagado de vez. Precisa ser maior que o prazo para anonimizar.",
+    valueType: "int",
+    value: "60",
+  },
+  {
     key: "notifications.email",
     module: "NOTIFICATIONS",
     label: "Notificações por e-mail",
@@ -89,6 +107,8 @@ describe("GET /api/client/system-configs", () => {
       "app.name": "Meu Produto",
       "app.supportEmail": "suporte@example.com",
       "security.idleTimeoutMinutes": "45",
+      "audit.anonymizeAfterMonths": "12",
+      "audit.deleteAfterMonths": "60",
       "notifications.email": "false",
     });
   });

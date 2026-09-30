@@ -1,9 +1,16 @@
+import { BadRequestError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { AUDIT_DESCRIPTIONS } from "@/modules/audit/audit.descriptions";
 import { type AuditEntry, recordAuditService } from "@/modules/audit/services/recordAudit.service";
 import { type UpdateSystemConfigsBody } from "@/modules/systemConfigs/schemas/updateSystemConfigs.schema";
 import { listSystemConfigsService } from "@/modules/systemConfigs/services/listSystemConfigs.service";
-import { findSystemConfigDefinition, SYSTEM_CONFIG_KEYS } from "@/modules/systemConfigs/systemConfig.catalog";
+import {
+  crossKeyRuleMessage,
+  findSystemConfigDefinition,
+  SYSTEM_CONFIG_CROSS_KEY_RULES,
+  SYSTEM_CONFIG_KEYS,
+  systemConfigValueReader,
+} from "@/modules/systemConfigs/systemConfig.catalog";
 import { resolveSystemConfigValue, serializeSystemConfigValue } from "@/modules/systemConfigs/systemConfig.definition";
 
 interface UpdateSystemConfigsInput {
@@ -22,7 +29,9 @@ export function systemConfigsLockName(companyId: string): string {
 
 /**
  * Grava o lote numa transação (tudo ou nada), registra na trilha de auditoria cada chave que mudou (antes e depois
- * efetivos, o padrão quando não havia valor gravado) e devolve a lista completa, lida pelo mesmo `tx`.
+ * efetivos, o padrão quando não havia valor gravado) e devolve a lista completa, lida pelo mesmo `tx`. Antes de gravar,
+ * confere as regras entre chaves que o lote toca contra o resultado (o valor do lote, senão o gravado, senão o padrão):
+ * 400 sem gravar nada.
  */
 export async function updateSystemConfigsService({ companyId, items }: UpdateSystemConfigsInput) {
   // Ordem do catálogo: as linhas são gravadas (e os registros da trilha saem) na ordem da tela.
@@ -37,12 +46,25 @@ export async function updateSystemConfigsService({ companyId, items }: UpdateSys
     // devolve `void`; a trava se solta sozinha no fim da transação.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${systemConfigsLockName(companyId)}))`;
 
-    // Limitado pelo lote (uma linha por chave, pelo índice único).
+    // Regras entre chaves que o lote toca: leem também as chaves de fora do lote, pelo valor já gravado (ou o padrão).
+    const batchKeys = new Set<string>(orderedItems.map((item) => item.key));
+    const crossKeyRules = SYSTEM_CONFIG_CROSS_KEY_RULES.filter((rule) => rule.keys.some((key) => batchKeys.has(key)));
+
+    // Limitado pelo catálogo (uma linha por chave, pelo índice único): as do lote e as que as regras leem.
     const storedConfigs = await tx.systemConfig.findMany({
-      where: { companyId, key: { in: orderedItems.map((item) => item.key) } },
+      where: { companyId, key: { in: [...new Set([...batchKeys, ...crossKeyRules.flatMap((rule) => rule.keys)])] } },
       select: { key: true, value: true },
     });
     const storedValues = new Map(storedConfigs.map((config) => [config.key, config.value]));
+
+    const readValueAfter = systemConfigValueReader(
+      new Map([...storedValues, ...orderedItems.map((item): [string, string] => [item.key, item.value])]),
+    );
+    const brokenRule = crossKeyRules.find((rule) => !rule.isSatisfied(readValueAfter));
+
+    if (brokenRule) {
+      throw new BadRequestError(crossKeyRuleMessage(brokenRule));
+    }
 
     for (const { key, value } of orderedItems) {
       await tx.systemConfig.upsert({

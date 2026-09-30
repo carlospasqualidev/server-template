@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { errorResponseSchema } from "@/lib/http/responses";
 import { systemConfigListSchema } from "@/modules/systemConfigs/schemas/systemConfig.schemas";
-import { findSystemConfigDefinition, SYSTEM_CONFIG_KEYS } from "@/modules/systemConfigs/systemConfig.catalog";
+import {
+  crossKeyRuleMessage,
+  findSystemConfigDefinition,
+  SYSTEM_CONFIG_CROSS_KEY_RULES,
+  SYSTEM_CONFIG_KEYS,
+  systemConfigValueReader,
+} from "@/modules/systemConfigs/systemConfig.catalog";
 import { parseSystemConfigValue, serializeSystemConfigValue } from "@/modules/systemConfigs/systemConfig.definition";
 
 /**
@@ -56,8 +62,24 @@ export const updateSystemConfigsBodySchema = z.object({
 
         seenKeys.add(item.key);
       }
+
+      // Regra entre chaves com todas as chaves no lote: o erro aponta para o item da chave da regra. A que depende de
+      // valor já gravado fica para o service, que lê com a trava dos lotes da empresa.
+      const batchValues = new Map(items.map((item) => [item.key, item.value]));
+
+      for (const rule of SYSTEM_CONFIG_CROSS_KEY_RULES) {
+        if (rule.keys.every((key) => batchValues.has(key)) && !rule.isSatisfied(systemConfigValueReader(batchValues))) {
+          context.addIssue({
+            code: "custom",
+            path: [items.findIndex((item) => item.key === rule.reportOn), "value"],
+            message: crossKeyRuleMessage(rule),
+          });
+        }
+      }
     })
-    .describe("Configurações alteradas, cada chave uma vez. Todas são gravadas, ou nenhuma."),
+    .describe(
+      "Configurações alteradas, cada chave uma vez. Todas são gravadas, ou nenhuma. Regras entre chaves (o prazo para apagar a auditoria maior que o para anonimizar) valem sobre o resultado: o valor do lote, senão o gravado, senão o padrão.",
+    ),
 });
 
 export type UpdateSystemConfigsBody = z.infer<typeof updateSystemConfigsBodySchema>;
@@ -71,7 +93,7 @@ export const updateSystemConfigsRouteSchema = {
   tags: ["SystemConfigs"],
   summary: "Grava configurações de sistema da empresa em lote",
   description:
-    "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Responde a lista completa, como `GET /system-configs`.",
+    "Exige `backoffice.systemConfigs.update`. Grava numa transação todas as configurações enviadas, ou nenhuma: basta um item inválido (chave desconhecida, valor fora do tipo ou da regra da chave, chave repetida) para responder 400 sem gravar nada. Regra entre chaves: `audit.deleteAfterMonths` maior que `audit.anonymizeAfterMonths`, conferida no lote (400 com `issues` no item de `audit.deleteAfterMonths`) e contra o valor já gravado ou o padrão, quando o lote traz só uma das duas (400 só com `message`). Responde a lista completa, como `GET /system-configs`.",
   security: [{ cookieAuth: [] }],
   body: updateSystemConfigsBodySchema,
   response: {

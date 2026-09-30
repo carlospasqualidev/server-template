@@ -166,7 +166,12 @@ interface AuditLogOverrides {
   after?: Prisma.InputJsonObject | null;
   /** Autor; ausente ou null = ação do sistema. */
   userId?: string | null;
+  requestId?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
   createdAt?: Date;
+  /** Ausente ou null = ainda não anonimizado pela retenção. */
+  anonymizedAt?: Date | null;
 }
 
 /** Registro da trilha gravado direto (sem passar por uma mutação), para semear listagem, filtro e detalhe. */
@@ -183,6 +188,10 @@ export async function createAuditLog(overrides: AuditLogOverrides) {
       before: overrides.before ?? Prisma.DbNull,
       after: overrides.after ?? Prisma.DbNull,
       userId: overrides.userId ?? null,
+      requestId: overrides.requestId ?? null,
+      ip: overrides.ip ?? null,
+      userAgent: overrides.userAgent ?? null,
+      anonymizedAt: overrides.anonymizedAt ?? null,
       ...(overrides.createdAt && { createdAt: overrides.createdAt }),
     },
   });

@@ -58,6 +58,7 @@ Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run
 | `npm run db:generate`             | Gera o client do Prisma em `src/generated`          |
 | `npm run db:studio`               | Prisma Studio                                       |
 | `npm run openapi:export`          | Grava o contrato em `docs/openapi.json`             |
+| `npm run audit:retention`         | Roda uma vez a retenção da trilha de auditoria      |
 | `npm run clean`                   | Remove `dist/`, `coverage/` e o client gerado       |
 
 ## Variáveis de ambiente
@@ -74,9 +75,10 @@ Validadas com Zod em `src/config/env.ts` na subida. Obrigatória ausente derruba
 | `PROJECT_ENVIRONMENT` (rótulo enviado ao log de erros)                             | não         | valor de `NODE_ENV`                           |
 | `LOG_LEVEL`                                                                        | não         | `debug` em dev, `info` em produção            |
 | `SESSION_TTL_HOURS`                                                                | não         | `12`                                          |
-| `CORS_ORIGINS` (lista separada por vírgula)                                        | não         | `http://localhost:5173,http://localhost:4173` |
+| `CORS_ORIGINS` (lista separada por vírgula; `*` é recusado)                        | não         | `http://localhost:5173,http://localhost:4173` |
 | `ERROR_LOG_URL` (POST de erros 500, só em produção)                                | não         |                                               |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, `AWS_BUCKET_REGION` | não         | sem as quatro, upload responde 503            |
+| `AUDIT_RETENTION_ENABLED` (`true` / `false`: retenção diária da auditoria)         | não         | `true` (sempre desligada em teste)            |
 
 Em produção o cookie de sessão é enviado com `Secure`; use HTTPS.
 
@@ -131,11 +133,15 @@ O usuário do CRUD (`/users`) traz, além do cadastro, os cargos que valem (`rol
 
 ## Configurações de sistema
 
-Cada empresa ajusta as configurações numa tela única. As definições (rótulo, tipo, padrão e regra de validação) ficam no código, em `src/modules/systemConfigs/systemConfig.catalog.ts`; o banco guarda só os valores que a empresa gravou, e o que não foi gravado vale o padrão. `value` trafega sempre como texto. A gravação é em lote e atômica: um item inválido responde 400 e nada é gravado. Chaves iniciais: `app.name`, `app.supportEmail`, `security.idleTimeoutMinutes` (padrão 20, de 1 a 480) e `notifications.email`. Como acrescentar uma chave: [`CLAUDE.md`](CLAUDE.md#configurações-de-sistema).
+Cada empresa ajusta as configurações numa tela única. As definições (rótulo, tipo, padrão e regra de validação) ficam no código, em `src/modules/systemConfigs/systemConfig.catalog.ts`; o banco guarda só os valores que a empresa gravou, e o que não foi gravado vale o padrão. `value` trafega sempre como texto. A gravação é em lote e atômica: um item inválido responde 400 e nada é gravado. Chaves iniciais: `app.name`, `app.supportEmail`, `security.idleTimeoutMinutes` (padrão 20, de 1 a 480), `audit.anonymizeAfterMonths` (padrão 12, de 1 a 120), `audit.deleteAfterMonths` (padrão 60, de 2 a 240, sempre maior que o anterior) e `notifications.email`. Como acrescentar uma chave: [`CLAUDE.md`](CLAUDE.md#configurações-de-sistema).
 
 ## Trilha de auditoria
 
-Toda mudança relevante numa empresa (usuários, cargos, vínculos entre eles, configurações), todo login e toda exportação ficam registrados com autor, os valores antes e depois e uma frase que nomeia o registro (`Editou o usuário "Maria Alves".`), gravados na mesma transação da mudança: se ela falha, nada é registrado. Quem tem `backoffice.audit.read` consulta a trilha da própria empresa em `/audit-logs`, com filtros por módulo, entidade, ação, autor, registro e período, detalhe, busca por conteúdo, que acha um evento por qualquer valor gravado (um e-mail, um nome antigo), e a linha do tempo de um registro (`/audit-logs/entities/User/<id>`: tudo o que aconteceu com ele). O detalhe e a linha do tempo trazem o que mudou em português, pronto para exibir: `Nome: Maria → Maria Alves`, `Ativo: Sim → Não`, com datas, números e vazios formatados pelo servidor (rótulos de campo por entidade, no catálogo do módulo). A trilha guarda dado pessoal (nome, e-mail, telefone e foto do usuário) por decisão do projeto, com finalidade de segurança e prestação de contas; prazo e anonimização ainda não existem. Nunca guarda senha, hash ou valor de configuração secreta; o nome do autor vem do cadastro. IP e user-agent da requisição são gravados, mas não saem pela API. Rota de exportação nova grava a exportação com formato e filtros. Como instrumentar uma mutação ou uma exportação: [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria).
+Toda mudança relevante numa empresa (usuários, cargos, vínculos entre eles, configurações), todo login e toda exportação ficam registrados com autor, os valores antes e depois e uma frase que nomeia o registro (`Editou o usuário "Maria Alves".`), gravados na mesma transação da mudança: se ela falha, nada é registrado. Quem tem `backoffice.audit.read` consulta a trilha da própria empresa em `/audit-logs`, com filtros por módulo, entidade, ação, autor, registro e período, detalhe, busca por conteúdo, que acha um evento por qualquer valor gravado (um e-mail, um nome antigo), e a linha do tempo de um registro (`/audit-logs/entities/User/<id>`: tudo o que aconteceu com ele). O detalhe e a linha do tempo trazem o que mudou em português, pronto para exibir: `Nome: Maria → Maria Alves`, `Ativo: Sim → Não`, com datas, números e vazios formatados pelo servidor (rótulos de campo por entidade, no catálogo do módulo). A trilha guarda dado pessoal (nome, e-mail, telefone e foto do usuário) por decisão do projeto, com finalidade de segurança e prestação de contas, e por prazo: cada empresa define nas configurações quando o evento é anonimizado (padrão 12 meses: some o autor, o IP, o user-agent e os dados pessoais, e a frase perde o nome, mas continua se sabendo o que mudou) e quando é apagado (padrão 60 meses). Nunca guarda senha, hash ou valor de configuração secreta; o nome do autor vem do cadastro. IP e user-agent da requisição são gravados, mas não saem pela API. Rota de exportação nova grava a exportação com formato e filtros. Como instrumentar uma mutação ou uma exportação: [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria).
+
+A retenção roda todo dia às 03:00 UTC dentro do próprio servidor (toda instância agenda; uma trava no banco deixa uma só trabalhar) e, sob demanda, por `npm run audit:retention` (na imagem de produção, `node dist/scripts/runAuditRetention.js`), para quem prefere um cron externo com `AUDIT_RETENTION_ENABLED=false`. Cada execução trabalha por até 55 minutos e para entre dois lotes; a seguinte continua de onde ela parou. No encerramento do servidor, a execução em curso termina o lote antes de o banco ser desconectado. Pedido de eliminação de um titular: `anonymizeAuditForUserService({ companyId, userId })` anonimiza na hora os eventos em que ele é autor ou alvo (sem rota; ver [`CLAUDE.md`](CLAUDE.md#trilha-de-auditoria)).
+
+> **Adotando o template num projeto que já tem histórico de auditoria?** A retenção vem ligada por padrão, e a primeira execução anonimiza os eventos com mais de 12 meses e apaga os com mais de 60 (ou pelos prazos que cada empresa tiver gravado), de forma **irreversível**. Suba com `AUDIT_RETENTION_ENABLED=false`, ajuste os prazos nas configurações de cada empresa (`audit.anonymizeAfterMonths` e `audit.deleteAfterMonths`) e só então ligue a retenção.
 
 A busca usa índices trigram do Postgres: a migration `20260929234145_audit_logs_content_search` instala a extensão `pg_trgm` (`CREATE EXTENSION IF NOT EXISTS`). Ela vem no Postgres oficial e é confiável desde o 13 (o dono do banco a instala sem superusuário); num Postgres gerenciado, confirme que ela está liberada antes do `migrate deploy`.
 
@@ -144,11 +150,11 @@ A busca usa índices trigram do Postgres: a migration `20260929234145_audit_logs
 ```
 src/
   app.ts            monta a aplicação (plugins, Zod, error handler, rotas)
-  server.ts         sincroniza o catálogo de permissões, listen + graceful shutdown
+  server.ts         sincroniza o catálogo de permissões, agenda a retenção da auditoria, listen + graceful shutdown
   routes.ts         /api → /client → módulos (grupo protegido por requireSession)
   config/           env (Zod), constants, cors, logger, swagger
   hooks/            requireSession, requirePermission
-  lib/              prisma, errors, http (paginação/respostas), validation, auth, audit (contexto e antes/depois), storage, format
+  lib/              prisma, errors, http (paginação/respostas), validation, auth, audit (contexto, antes/depois, corte da retenção), jobs (agendamento diário), storage, format
   modules/
     health/         liveness e readiness
     session/        login, register, logout
@@ -157,7 +163,8 @@ src/
     permissions/    catálogo de permissões, sincronização, cargo Administrador, permissões efetivas
     roles/          gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo
     systemConfigs/  configurações por empresa: catálogo no código, leitura, gravação em lote, timeout de inatividade
-    audit/          trilha de auditoria: gravação nas mutações e exportações, frases, lista com busca, detalhe e opções
+    audit/          trilha de auditoria: gravação nas mutações e exportações, frases, lista com busca, detalhe, opções e retenção
+  scripts/          linha de comando compilada com a app (retenção da auditoria sob demanda)
   tests/            suíte de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado
@@ -181,7 +188,8 @@ O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e crede
 - `Dockerfile` multi-stage: compila em `node:22-slim`, roda `dist/server.js` só com dependências de produção.
 - Migrations rodam fora da imagem: `npx prisma migrate deploy` no pipeline, antes de subir a nova versão. A subida depende disso: antes do `listen` o servidor sincroniza o catálogo de permissões e, se falhar, encerra com erro. O usuário do banco precisa poder criar a extensão `pg_trgm` (ver **Trilha de auditoria**).
 - Health checks para o orquestrador: `/health` (liveness) e `/health/ready` (readiness).
-- O processo encerra com `SIGTERM` fechando conexões (graceful shutdown).
+- Retenção da trilha de auditoria: agendada pelo próprio servidor (03:00 UTC). Com cron externo, desligue-a (`AUDIT_RETENTION_ENABLED=false`) e rode na mesma imagem `node dist/scripts/runAuditRetention.js` (mesmas variáveis do servidor; sai com código 1 se falhar).
+- O processo encerra com `SIGTERM` fechando conexões (graceful shutdown); uma retenção em curso termina o lote atual antes (até 5 s).
 
 ## Swagger
 

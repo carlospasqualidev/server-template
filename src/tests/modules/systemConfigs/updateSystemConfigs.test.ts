@@ -5,12 +5,19 @@ import { PERMISSION_DENIED_MESSAGE } from "@/hooks/requirePermission";
 import { prisma } from "@/lib/prisma";
 import { PERMISSION_NAMES } from "@/modules/permissions/permission.catalog";
 import { createTestApp } from "@/tests/helpers/app";
-import { createSystemConfig, createUser } from "@/tests/helpers/factories";
+import { createSystemConfig, createUser, findAuditLogs } from "@/tests/helpers/factories";
 import { sessionCookiesFor } from "@/tests/helpers/session";
+import { raceAgainstSystemConfigsBatch } from "@/tests/helpers/systemConfigsLock";
 
 const SYSTEM_CONFIGS_URL = "/api/client/system-configs";
 
 const IDLE_TIMEOUT_LABEL = "Tempo de inatividade até o logout (min)";
+
+const ANONYMIZE_LABEL = "Prazo para anonimizar a auditoria (meses)";
+
+const DELETE_LABEL = "Prazo para apagar a auditoria (meses)";
+
+const RETENTION_RULE_MESSAGE = `${DELETE_LABEL}: Informe um valor maior que o prazo para anonimizar.`;
 
 function valuesByKey(body: { systemConfigs: { key: string; value: string }[] }): Record<string, string> {
   return Object.fromEntries(body.systemConfigs.map((config) => [config.key, config.value]));
@@ -61,6 +68,8 @@ describe("PATCH /api/client/system-configs", () => {
       "app.name": "Meu Produto",
       "app.supportEmail": "suporte@example.com",
       "security.idleTimeoutMinutes": "45",
+      "audit.anonymizeAfterMonths": "12",
+      "audit.deleteAfterMonths": "60",
       "notifications.email": "false",
     });
 
@@ -145,6 +154,26 @@ describe("PATCH /api/client/system-configs", () => {
       message: "E-mail de suporte: O e-mail deve possuir o formato email@example.com.",
     },
     { case: "texto vazio", item: { key: "app.name", value: "   " }, message: "Nome da aplicação: Informe o nome." },
+    {
+      case: "prazo para anonimizar abaixo da faixa",
+      item: { key: "audit.anonymizeAfterMonths", value: "0" },
+      message: `${ANONYMIZE_LABEL}: Informe um valor de 1 a 120 meses.`,
+    },
+    {
+      case: "prazo para anonimizar acima da faixa",
+      item: { key: "audit.anonymizeAfterMonths", value: "121" },
+      message: `${ANONYMIZE_LABEL}: Informe um valor de 1 a 120 meses.`,
+    },
+    {
+      case: "prazo para apagar abaixo da faixa",
+      item: { key: "audit.deleteAfterMonths", value: "1" },
+      message: `${DELETE_LABEL}: Informe um valor de 2 a 240 meses.`,
+    },
+    {
+      case: "prazo para apagar acima da faixa",
+      item: { key: "audit.deleteAfterMonths", value: "241" },
+      message: `${DELETE_LABEL}: Informe um valor de 2 a 240 meses.`,
+    },
   ])("$case responde 400 citando o rótulo, sem repetir o valor", async ({ item, message }) => {
     const admin = await createUser();
 
@@ -155,6 +184,111 @@ describe("PATCH /api/client/system-configs", () => {
     // Mensagem exata: o rótulo e a regra, nunca o valor enviado.
     expect(response.json().message).toBe(`items.0.value: ${message}`);
     expect(await storedValues(admin.companyId)).toEqual({});
+  });
+
+  describe("prazos de retenção da auditoria (regra entre chaves)", () => {
+    it("grava os dois prazos no mesmo lote quando o de apagar é maior", async () => {
+      const admin = await createUser();
+
+      const response = await patchConfigs(admin.id, [
+        { key: "audit.deleteAfterMonths", value: "36" },
+        { key: "audit.anonymizeAfterMonths", value: "24" },
+      ]);
+
+      expect(response.statusCode).toBe(200);
+      expect(await storedValues(admin.companyId)).toEqual({
+        "audit.anonymizeAfterMonths": "24",
+        "audit.deleteAfterMonths": "36",
+      });
+    });
+
+    it.each([
+      { case: "iguais", anonymize: "24", remove: "24" },
+      { case: "o de apagar menor", anonymize: "24", remove: "12" },
+    ])("os dois no lote, $case: 400 no item do prazo de apagar, nada gravado", async ({ anonymize, remove }) => {
+      const admin = await createUser();
+
+      const response = await patchConfigs(admin.id, [
+        { key: "app.name", value: "Novo nome" },
+        { key: "audit.anonymizeAfterMonths", value: anonymize },
+        { key: "audit.deleteAfterMonths", value: remove },
+      ]);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        message: `items.2.value: ${RETENTION_RULE_MESSAGE}`,
+        issues: [{ path: "items.2.value", message: RETENTION_RULE_MESSAGE }],
+      });
+      expect(await storedValues(admin.companyId)).toEqual({});
+    });
+
+    it.each([
+      {
+        case: "prazo para anonimizar contra o padrão de apagar (60)",
+        item: { key: "audit.anonymizeAfterMonths", value: "60" },
+        stored: [],
+      },
+      {
+        case: "prazo para apagar contra o padrão de anonimizar (12)",
+        item: { key: "audit.deleteAfterMonths", value: "12" },
+        stored: [],
+      },
+      {
+        case: "prazo para anonimizar contra o de apagar gravado",
+        item: { key: "audit.anonymizeAfterMonths", value: "30" },
+        stored: [{ key: "audit.deleteAfterMonths", value: "24" }],
+      },
+      {
+        case: "prazo para apagar contra o de anonimizar gravado",
+        item: { key: "audit.deleteAfterMonths", value: "5" },
+        stored: [{ key: "audit.anonymizeAfterMonths", value: "6" }],
+      },
+    ] as const)("só uma chave no lote, $case: 400 sem gravar nada", async ({ item, stored }) => {
+      const admin = await createUser();
+
+      for (const config of stored) {
+        await createSystemConfig({ companyId: admin.companyId, ...config });
+      }
+
+      const response = await patchConfigs(admin.id, [{ key: "app.name", value: "Novo nome" }, item]);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: RETENTION_RULE_MESSAGE });
+      expect(await storedValues(admin.companyId)).toEqual(
+        Object.fromEntries(stored.map((config) => [config.key, config.value])),
+      );
+      expect(await findAuditLogs(admin.companyId)).toEqual([]);
+    });
+
+    it("só uma chave no lote, válida contra a gravada: grava", async () => {
+      const admin = await createUser();
+      await createSystemConfig({ companyId: admin.companyId, key: "audit.anonymizeAfterMonths", value: "3" });
+
+      const response = await patchConfigs(admin.id, [{ key: "audit.deleteAfterMonths", value: "6" }]);
+
+      expect(response.statusCode).toBe(200);
+      expect(await storedValues(admin.companyId)).toEqual({
+        "audit.anonymizeAfterMonths": "3",
+        "audit.deleteAfterMonths": "6",
+      });
+    });
+
+    it("confere contra o gravado depois da trava: o lote simultâneo que confirmou antes conta", async () => {
+      const admin = await createUser();
+
+      // Outro lote da empresa grava o prazo de apagar em 24 e ainda não confirmou; este, que só traz o de anonimizar
+      // em 30 (válido contra o padrão de 60), espera a trava e lê os 24 já confirmados.
+      const response = await raceAgainstSystemConfigsBatch({
+        companyId: admin.companyId,
+        lockedWrite: (tx) =>
+          tx.systemConfig.create({ data: { companyId: admin.companyId, key: "audit.deleteAfterMonths", value: "24" } }),
+        operation: () => patchConfigs(admin.id, [{ key: "audit.anonymizeAfterMonths", value: "30" }]),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ message: RETENTION_RULE_MESSAGE });
+      expect(await storedValues(admin.companyId)).toEqual({ "audit.deleteAfterMonths": "24" });
+    });
   });
 
   it("chave desconhecida responde 400", async () => {

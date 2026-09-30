@@ -23,13 +23,16 @@ const auditLogBaseSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha.",
+      "Resumo pt-BR no passado com o nome do registro afetado entre aspas (nome do usuário, do cargo, rótulo da configuração); nunca e-mail nem senha. Evento anonimizado pela retenção traz a frase genérica, sem nome (`Editou um usuário.`).",
     )
     .meta({ examples: ['Bloqueou o usuário "Maria Alves".'] }),
   changedFields: z
     .array(z.string())
     .describe("Campos alterados, para destacar no detalhe. Vazio em criação, exclusão, login e exportação."),
-  userId: z.string().nullable().describe("Autor da ação; null quando foi o sistema."),
+  userId: z
+    .string()
+    .nullable()
+    .describe("Autor da ação; null quando foi o sistema ou quando o evento foi anonimizado."),
   createdAt: dateTimeOutputSchema,
 });
 
@@ -37,7 +40,9 @@ export const auditLogListItemSchema = auditLogBaseSchema.extend({
   userName: z
     .string()
     .nullable()
-    .describe("Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema."),
+    .describe(
+      "Nome do autor, lido do cadastro (o atual, inclusive de usuário excluído); null quando foi o sistema ou o evento foi anonimizado.",
+    ),
 });
 
 const auditSnapshotSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).nullable();
@@ -71,7 +76,7 @@ export const auditFieldChangesSchema = z
 
 export const auditLogDetailSchema = auditLogBaseSchema.extend({
   before: auditSnapshotSchema.describe(
-    "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`.",
+    "Estado anterior, só com valores primitivos, dados pessoais inclusive (nome, e-mail, telefone); null na criação, no login e na exportação. Senha, hash e token nunca aparecem; valor secreto de configuração aparece como `[omitido]`, e os dados pessoais também, depois que a retenção anonimiza o evento.",
   ),
   after: auditSnapshotSchema.describe(
     "Estado posterior, no mesmo formato; null na exclusão e no login. Na exportação, o formato e os filtros aplicados, com chave pt-BR (`formato`, `busca`...).",
@@ -83,7 +88,9 @@ export const auditLogDetailSchema = auditLogBaseSchema.extend({
       email: z.string().describe("E-mail do autor."),
     })
     .nullable()
-    .describe("Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema."),
+    .describe(
+      "Autor, lido do cadastro (inclusive de usuário excluído); null quando foi o sistema ou o evento foi anonimizado.",
+    ),
   fieldChanges: auditFieldChangesSchema,
 });
 

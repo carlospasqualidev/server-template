@@ -17,7 +17,8 @@ interface RecordExportAuditInput {
   format: AuditExportFormat;
   /**
    * Filtros aplicados à exportação, com chave pt-BR em camelCase, como o sul-oxidos (`{ busca: "ana", cargos: [...],
-   * criadoDe: date }`): é o que a trilha mostra. Mande o valor já legível (nome do cargo, não o id) quando houver.
+   * criadoDe: date }`): é o que a trilha mostra. Mande o valor já legível (nome do cargo, não o id) quando houver. O
+   * termo de texto livre vai sempre em `busca` (`AUDIT_EXPORT_SEARCH_FILTER`): é o filtro que a anonimização omite.
    */
   filters: Readonly<Record<string, ExportAuditFilterValue>>;
 }

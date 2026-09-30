@@ -17,6 +17,12 @@ export const AUDIT_EXPORT_FORMATS = ["CSV", "XLSX", "PDF"] as const;
 
 export type AuditExportFormat = (typeof AUDIT_EXPORT_FORMATS)[number];
 
+/**
+ * Chave do filtro de texto livre no `after` de uma exportação (`recordExportAuditService`): o termo digitado vai sempre
+ * nela. Pode ser um nome ou um e-mail, então a anonimização troca o valor pelo marcador; os demais filtros ficam.
+ */
+export const AUDIT_EXPORT_SEARCH_FILTER = "busca";
+
 /** O `Record` obriga uma entrada para cada valor (enum ou entidade nova não compila sem ela); o código lê o `Map`. */
 function toCatalogMap<TKey extends string, TValue>(entries: Record<TKey, TValue>): ReadonlyMap<TKey, TValue> {
   return new Map(Object.entries(entries) as [TKey, TValue][]);

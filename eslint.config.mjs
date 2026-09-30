@@ -94,6 +94,13 @@ export default defineConfig(
     },
   },
   {
+    // Scripts de linha de comando compilados com a aplicação (rodam também na imagem de produção): a saída é o console.
+    files: ["src/scripts/**"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+  {
     files: ["vitest.config.ts"],
     rules: {
       "no-restricted-imports": "off",

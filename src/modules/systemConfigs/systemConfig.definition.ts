@@ -37,9 +37,15 @@ interface SystemConfigDefinitionOf<TType extends SystemConfigValueType> {
   /**
    * O valor é secreto (ex.: chave de API, senha de integração): a trilha de auditoria registra que a chave mudou, com o
    * valor trocado por um marcador fixo em `before`/`after`. Dado pessoal (ex.: e-mail de uma pessoa) não é segredo e
-   * não leva esta marca: a trilha guarda o valor, e a retenção cuida dele.
+   * não leva esta marca: leva `personalData`.
    */
   redactInAudit?: true;
+  /**
+   * O valor pode ser dado pessoal (ex.: o e-mail de uma pessoa): a trilha de auditoria grava o valor, como os campos
+   * pessoais das entidades, e a anonimização (prazo da retenção ou pedido de titular) o troca por um marcador fixo em
+   * `before`/`after`.
+   */
+  personalData?: true;
 }
 
 /** Definição de uma configuração. `valueType`, `defaultValue` e `rule` concordam entre si: `int` só aceita número. */

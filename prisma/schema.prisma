@@ -184,6 +184,12 @@ enum AuditAction {
 /// `audit_logs_after_values_trgm_idx`, existem so na migration `*_audit_logs_search_values`: o Prisma nao modela
 /// indice de expressao, e o `migrate dev` nao os enxerga nem tenta remove-los. Nao os declare aqui. A consulta
 /// (`listAuditLogsService`) repete a expressao igual; mudar uma exige mudar a outra, senao o indice deixa de ser usado.
+///
+/// Retencao (`runAuditRetentionService`, prazos por empresa nas configuracoes `audit.*`): passado o primeiro prazo o
+/// evento e anonimizado (autor, IP e user-agent nulos, campos pessoais `[omitido]`, frase generica) e `anonymizedAt`
+/// marca que ja foi; passado o segundo, apagado. O indice `[companyId, anonymizedAt, createdAt]` leva a varredura
+/// direto aos eventos ainda nao anonimizados (`anonymizedAt IS NULL`) mais velhos que o prazo, sem reler os ja
+/// anonimizados; a exclusao por idade usa o `[companyId, createdAt]`.
 model AuditLog {
   id            String      @id @default(uuid(7))
   companyId     String
@@ -200,11 +206,13 @@ model AuditLog {
   ip            String?
   userAgent     String?
   createdAt     DateTime    @default(now())
+  anonymizedAt  DateTime?
 
   company Company @relation(fields: [companyId], references: [id])
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
+  @@index([companyId, anonymizedAt, createdAt])
   @@index([companyId, entity, entityId])
   @@index([userId])
   @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "audit_logs_description_trgm_idx")
