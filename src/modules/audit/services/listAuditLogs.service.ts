@@ -168,7 +168,7 @@ function toJsonContainsLikePattern(term: string): string {
  * (não no nome das chaves), na entidade (nome técnico ou rótulo) e no nome do autor.
  *
  * Termo sem três letras ou dígitos seguidos (`ab`, `50%`) não forma trigrama: os índices não ajudam e o Postgres lê
- * as linhas da empresa. O resultado é o mesmo; só o custo cresce com o volume (ver "Trilha de auditoria" no CLAUDE.md).
+ * as linhas da empresa. O resultado é o mesmo; só o custo cresce com o volume (ver "Trilha de auditoria" em docs/conventions.md).
  */
 async function resolveContentSearch(companyId: string, term: string): Promise<ContentSearch> {
   const pattern = toContainsLikePattern(term);
