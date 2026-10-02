@@ -13,7 +13,7 @@ export default defineConfig({
     include: ["src/tests/**/*.test.ts"],
     globalSetup: ["./src/tests/globalSetup.ts"],
     setupFiles: ["./src/tests/setup.ts"],
-    // Um único banco de teste: os arquivos rodam em sequência para não interferirem entre si.
+    // Um banco temporário por execução, compartilhado pelos arquivos: eles rodam em sequência para não interferirem.
     fileParallelism: false,
     env: testEnv,
     restoreMocks: true,

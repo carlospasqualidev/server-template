@@ -12,7 +12,7 @@ As convenções para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](
 - Sessão: JWT em cookie HTTP-only (`token`) para a web, ou em `Authorization: Bearer` para o app nativo, bcrypt para senha, rate limit no login e na troca da própria senha
 - Upload: streaming para AWS S3 (`@aws-sdk/lib-storage`)
 - Logs: pino (pretty em dev, JSON em produção)
-- Testes: Vitest + `app.inject()` contra o banco `server_template_test`
+- Testes: Vitest + `app.inject()` contra um Postgres local, num banco temporário por execução
 - Qualidade: ESLint (camadas, imports, segurança), Prettier, Husky + lint-staged, GitHub Actions
 
 ## Requisitos
@@ -26,7 +26,7 @@ As convenções para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](
 ```bash
 npm install                # instala e gera o client do Prisma (postinstall)
 cp .env.example .env       # ajuste JWT_SECRET e DATABASE_URL se necessário
-npm run db:up              # Postgres em docker (cria server_template e server_template_test)
+npm run db:up              # Postgres em docker (cria server_template)
 npm run db:deploy          # aplica as migrations
 npm run db:seed            # catálogo de permissões + admin@admin.com / 123123123 (Administrador)
 npm run dev                # http://localhost:8080
@@ -36,7 +36,7 @@ npm run dev                # http://localhost:8080
 - Swagger UI: `http://localhost:8080/docs` (JSON em `/docs/json`)
 - Health: `GET /health` (processo) e `GET /health/ready` (processo + banco)
 
-Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run db:up` e troque a porta em `DATABASE_URL`. A suíte de testes usa o mesmo servidor do `DATABASE_URL` do `.env`, só trocando o nome do banco para `server_template_test`.
+Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run db:up` e troque a porta em `DATABASE_URL`. A suíte de testes usa o mesmo servidor do `DATABASE_URL` do `.env`, num banco temporário próprio.
 
 ## Scripts
 
@@ -181,14 +181,16 @@ Cada módulo segue `routes → controllers → services → prisma`, com um arqu
 
 ## Testes
 
-A suíte é de integração real: sobe a aplicação com `app.inject()` (sem porta) e fala com o Postgres `server_template_test`, criado pelo compose (ou pelo `globalSetup`, se faltar). Cada teste começa com as tabelas truncadas; o S3 é mockado.
+A suíte é de integração real: sobe a aplicação com `app.inject()` (sem porta) e fala com um banco temporário `temporary-int-<carimbo>-<aleatório>`, criado e migrado pelo `globalSetup` e apagado no fim da execução, verde ou vermelha. Cada teste começa com as tabelas truncadas; o S3 é mockado.
 
 ```bash
 npm run db:up
 npm test
 ```
 
-O banco de teste é derivado do `DATABASE_URL` do `.env` (mesmo servidor e credenciais, banco `server_template_test`), então basta o `.env` estar certo para `npm test` e o hook de `pre-push` funcionarem. Para apontar outro servidor, `TEST_DATABASE_URL=postgresql://... npm test` (é o que o CI faz). Por segurança o nome do banco precisa terminar em `_test`.
+O servidor vem do `DATABASE_URL` do `.env` (mesmo servidor e credenciais), então basta o `.env` estar certo para `npm test` e o hook de `pre-push` funcionarem. Para outro servidor, `TEST_DATABASE_URL=postgresql://... npm test` (é o que o CI faz); o nome do banco da URL é ignorado.
+
+Só Postgres local: host fora de `localhost`, `127.0.0.1` e `::1` faz a suíte recusar rodar, sem flag de escape. Um `.env` apontando para um banco remoto é ignorado com aviso, e a suíte usa `localhost:5432`. Cada execução tem seu banco, então duas `npm test` simultâneas (outro worktree, o e2e do frontend) não colidem; bancos `temporary-int-*` com mais de 6 h, de execuções interrompidas, são apagados na próxima.
 
 ## Docker e produção
 

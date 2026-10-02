@@ -169,14 +169,18 @@ Regras práticas:
 
 Uma camada só: **integração real** com Vitest + `app.inject()` contra um Postgres descartável. Sem mock de banco, sem porta HTTP, sem Docker dentro do teste.
 
-- Banco de teste: `server_template_test` (criado pelo `docker compose` e, se faltar, pelo `globalSetup`). O `globalSetup` **recusa** rodar contra banco cujo nome não termine em `_test`, porque cada teste começa com `TRUNCATE` (ver `src/tests/setup.ts`). **Tabela nova entra na lista do `TRUNCATE`.** Depois do `TRUNCATE`, o `setup.ts` roda `syncPermissionCatalogService()`: todo teste começa com o catálogo de permissões no banco.
-- Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local, exceto pelo endereço do banco, derivado do `DATABASE_URL` do arquivo `.env` (mesmo servidor, banco `server_template_test`). `TEST_DATABASE_URL` sobrescreve (CI). O `DATABASE_URL` do shell é ignorado de propósito.
+- Banco de teste: **um banco temporário por execução**, `temporary-int-<AAAAMMDDhhmmss UTC>-<aleatório>`. O `globalSetup` apaga os `temporary-int-*` com mais de 6 h (órfãos de execução morta; os recentes podem ser de outra em curso), cria o seu, roda `migrate deploy` e entrega a URL aos workers (`provide`/`inject`, aplicada por `temporaryDatabaseEnv.ts`, primeiro import do `setup.ts`); o teardown o apaga com `DROP DATABASE ... WITH (FORCE)`, com a suíte verde ou vermelha. Duas execuções simultâneas (worktrees, agentes, e2e do frontend) não colidem. `TRUNCATE` e `DROP` só rodam em banco com o prefixo `temporary-int-` (ver `src/tests/setup.ts`). **Tabela nova entra na lista do `TRUNCATE`.** Depois do `TRUNCATE`, o `setup.ts` roda `syncPermissionCatalogService()`: todo teste começa com o catálogo de permissões no banco.
+- **Só Postgres local**: o servidor vem de `TEST_DATABASE_URL` (CI), senão do `DATABASE_URL` do arquivo `.env`, senão `localhost:5432` (o do compose); o nome do banco da URL é ignorado. A URL final é recusada, antes de qualquer conexão, se o host não for `localhost`, `127.0.0.1` ou `::1` (o nome `postgres` do compose também é recusado: fora da rede do compose ele pode resolver para um servidor remoto), ou se tiver `?host=`/`?hostaddr=`. Sem flag de escape. Um `.env` remoto (RDS) é ignorado com aviso de uma linha e a suíte cai no `localhost:5432`. Regras e testes em `src/tests/testDatabase.ts` e `src/tests/config/testDatabase.test.ts`.
+- Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local; o `DATABASE_URL` do shell é ignorado de propósito.
+- O `migrate deploy` por execução custa ~1,5 s nesta suíte; banco-modelo (`CREATE DATABASE ... TEMPLATE`) só vale a pena se passar de ~10 s.
 - Todos os testes vivem em [`src/tests/`](src/tests), importados via alias `@/`:
 
 ```
 src/tests/
 ├── setup.ts                       # TRUNCATE + sincronização do catálogo de permissões antes de cada teste, $disconnect no fim
-├── globalSetup.ts                 # cria o banco de teste e roda migrate deploy
+├── globalSetup.ts                 # apaga órfãos, cria o banco temporário, roda migrate deploy; teardown apaga o banco
+├── testDatabase.ts                # trava de host local, resolução do servidor, nome e idade dos bancos `temporary-int-*`
+├── temporaryDatabaseEnv.ts        # aponta DATABASE_URL do worker para o banco temporário (primeiro import do setup.ts)
 ├── testEnv.ts
 ├── helpers/
 │   ├── app.ts                     # createTestApp(options) → app pronto para inject()
@@ -189,7 +193,7 @@ src/tests/
 │   └── multipart.ts               # buildMultipartBody([...]) para upload
 ├── modules/<módulo>/<endpoint>.test.ts
 ├── hooks/<hook>.test.ts
-├── config/<arquivo>.test.ts       # validação do ambiente (`loadEnv(source)`), preflight do CORS (`cors.test.ts`) e busca mascarada no log (`logger.test.ts`)
+├── config/<arquivo>.test.ts       # validação do ambiente (`loadEnv(source)`), banco de teste (`testDatabase.test.ts`), preflight do CORS (`cors.test.ts`) e busca mascarada no log (`logger.test.ts`)
 └── lib/<grupo>/<arquivo>.test.ts
 ```
 
@@ -539,7 +543,7 @@ O que `../frontend-template` já consome — mantenha compatível:
 
 - Windows (PowerShell) no dia a dia. Em comandos shell use sintaxe PS (`$env:VAR`, sem `&&` em PS 5.1) — nos scripts npm, `&&` funciona porque roda no shell do npm.
 - Node >= 22.12 (`.nvmrc` = 22; CI roda em Node 22). `npm` com `package-lock.json`.
-- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor.
+- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor (se for local).
 - bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
 - A imagem de runtime instala com `npm ci --omit=dev --omit=optional` (sem o CLI do Prisma nem o TypeScript, que o lockfile marca `devOptional`); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.
 

@@ -15,7 +15,6 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: server_template_test
         ports:
           - 5432:5432
         options: >-
@@ -26,8 +25,10 @@ jobs:
 
     env:
       HUSKY: 0
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/server_template_test
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/server_template_test
+      # Só para o `prisma generate` do postinstall; a suíte não lê DATABASE_URL do ambiente.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/server_template
+      # Servidor da suíte: o globalSetup cria e apaga nele um banco temporário `temporary-int-*`.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       JWT_SECRET: ci-secret-with-at-least-16-chars
 
     steps:
