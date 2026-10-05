@@ -1,0 +1,81 @@
+# Estrutura de pastas, scripts e ambiente
+
+Parte do [`CLAUDE.md`](../../CLAUDE.md), movida de lá sem reescrita: o texto é o mesmo e a versão curta de cada regra continua no núcleo. Leia antes de criar pasta, módulo ou camada nova, de procurar um script fora dos do dia a dia, de adicionar dependência nova, de mexer no `Dockerfile` ou de subir o Postgres em outra porta.
+
+## Estrutura de pastas
+
+```
+src/
+├── app.ts                  # buildApp(): plugins, compiladores Zod, error handler, rotas. Sem listen.
+├── server.ts               # sincroniza o catálogo de permissões, agenda a retenção da auditoria, listen + graceful shutdown (SIGINT/SIGTERM)
+├── routes.ts               # árvore /api → /client → módulos; grupo protegido com requireSession
+├── config/
+│   ├── env.ts              # ÚNICO lugar que lê process.env, validado com Zod
+│   ├── constants.ts        # cookie, paginação, limites, rate limit
+│   ├── cors.ts · logger.ts · swagger.ts
+├── hooks/
+│   ├── requireSession.ts   # onRequest das rotas protegidas: Bearer ou cookie → JWT → usuário + permissões → request.user
+│   └── requirePermission.ts # preHandler por rota: requirePermission(nome) / requireAnyPermission([nomes]) → 403
+├── lib/                    # infraestrutura compartilhada; NÃO importa de modules/
+│   ├── prisma.ts           # client único + `notDeleted`
+│   ├── errors/             # AppError e filhos, assertExists, errorHandler, reportError
+│   ├── http/               # pagination, query (search/boolean/csv/intervalo de datas), responses (erro, message, data), security (`sessionSecurity`: cookie ou Bearer no OpenAPI)
+│   ├── validation/         # primitivos Zod pt-BR (email, senha, cpf, cnpj, cep, telefone, URL de imagem, datas)
+│   ├── auth/               # password (bcrypt), session (JWT, cookie ou Bearer, openSession), authenticatedUser
+│   ├── audit/              # contexto da requisição para a trilha (auditContext), cura do antes/depois (auditSnapshot), corte da retenção (auditRetention)
+│   ├── jobs/               # agendamento diário em UTC no processo, preso ao encerramento do app (dailySchedule); quem agenda é o server.ts
+│   ├── storage/s3.ts       # client S3 preguiçoso, URL pública, 503 quando não configurado
+│   └── format/             # máscaras e unmask pt-BR
+├── modules/<módulo>/       # um módulo por recurso de negócio
+│   ├── <módulo>.routes.ts  # registra rotas: método, path, schema, handler
+│   ├── schemas/            # um arquivo por endpoint: body/query/params + response + rota (tags, summary)
+│   ├── controllers/        # um por endpoint: lê request, chama service, responde
+│   ├── services/           # um por caso de uso: regra de negócio + Prisma. Único lugar que importa @/lib/prisma
+│   └── <módulo>.select.ts  # (opcional) selects Prisma compartilhados pelo módulo
+├── scripts/                # linha de comando compilada com a app (roda também na imagem): runAuditRetention.ts
+├── generated/prisma/       # client gerado (gitignored)
+└── tests/                  # ver docs/testing-guide.md
+prisma/
+├── schema.prisma · migrations/ · seed.ts
+scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
+docs/openapi.json           # contrato gerado; commitado
+```
+
+> Verificar: possivelmente desatualizado — a árvore não lista `src/types/` (`src/types/fastify.d.ts`, `src/types/requestContext.d.ts`) nem o `tsconfig.build.json` usado pelo build (`package.json:13`).
+
+Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência e o autoatendimento em `/users/me`: perfil e troca da própria senha), `upload` (arquivo → S3), `audit` (trilha de auditoria: gravação pelas mutações e exportações, frases por entidade, rótulos de campo e de→para legível, lista com busca por conteúdo, detalhe, linha do tempo de um registro, opções de filtro e retenção: anonimizar e depois apagar, por empresa, e anonimização de um titular), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
+
+## Scripts
+
+<!-- prettier-ignore -->
+| Script                   | O que faz                                                          |
+| ------------------------ | ------------------------------------------------------------------ |
+| `npm run dev`            | API com `tsx` em watch, `.env` carregado pelo Node                 |
+| `npm run build`          | `tsc` + `tsc-alias` → `dist/` (ESM com extensões e alias resolvidos) |
+| `npm start`              | Roda `dist/server.js`                                              |
+| `npm run lint`           | ESLint (camadas, imports, segurança)                               |
+| `npm run format`         | Prettier (escrita)                                                 |
+| `npm run format:check`   | Prettier (só confere; roda no `check`, no `pre-push` e no CI)      |
+| `npm run typecheck`      | `tsc --noEmit`                                                     |
+| `npm test`               | Vitest run: projetos `unit` e `integration` (precisa do Postgres)  |
+| `npm run test:related`   | Só os testes afetados pelas mudanças não commitadas (`vitest run --changed`) |
+| `npm run test:watch`     | Vitest watch                                                       |
+| `npm run check`          | Lint + `format:check` + typecheck + test                           |
+| `npm run db:up` / `db:down` | Sobe/derruba o Postgres do compose                              |
+| `npm run db:migrate -- --name x` | Cria e aplica migration em dev                             |
+| `npm run db:deploy`      | Aplica migrations pendentes (CI/produção)                          |
+| `npm run db:seed`        | Sincroniza o catálogo de permissões e popula `admin@admin.com` / `123123123` (Administrador) |
+| `npm run db:generate`    | Gera o client do Prisma                                            |
+| `npm run db:studio`      | Prisma Studio                                                      |
+| `npm run openapi:export` | Grava `docs/openapi.json`                                          |
+| `npm run audit:retention` | Uma execução da retenção da trilha de auditoria (mesma trava do agendamento do servidor) |
+| `npm run clean`          | Remove `dist/`, `coverage/` e o client gerado                      |
+
+> Verificar: possivelmente desatualizado — a tabela não traz `db:reset` (`prisma migrate reset`, `package.json:29`), que `docs/guardrails.md:12` cita como destrutivo.
+
+## Ambiente
+
+- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor (se for local).
+  > Verificar: possivelmente desatualizado — "a suíte segue o mesmo servidor (se for local)" está incompleto: a ordem real é `TEST_DATABASE_URL`, depois o `DATABASE_URL` do `.env` se for local, depois o padrão (`src/tests/testDatabase.ts:70`).
+- bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
+- A imagem de runtime instala com `npm ci --omit=dev --omit=optional` (sem o CLI do Prisma nem o TypeScript, que o lockfile marca `devOptional`); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.
