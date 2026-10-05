@@ -108,7 +108,7 @@ describe("banco temporário", () => {
     expect(databaseNameOf(url)).toBe("temporary-int-20261002140509-a1");
   });
 
-  it("trava TRUNCATE e DROP fora do prefixo temporary-int-", () => {
+  it("trava o reset e o DROP fora do prefixo temporary-int-", () => {
     expect(() => assertTemporaryDatabase("temporary-int-20261002140509-a1")).not.toThrow();
     expect(() => assertTemporaryDatabase("server_template_test")).toThrow(
       'Banco de teste precisa começar com "temporary-int-" (recebido: "server_template_test").',

@@ -8,7 +8,7 @@ Guia para o Claude trabalhar neste backend. Este arquivo traz as regras gerais e
 
 ## Stack
 
-Node 22+ (ESM) • Fastify 5 • TypeScript strict • Zod 4 + `fastify-type-provider-zod` (um schema gera validação, tipo, serialização e OpenAPI) • Prisma 7 (PostgreSQL via driver adapter `pg`) • JWT em cookie HTTP-only (web) ou `Authorization: Bearer` (app nativo) • `@fastify/request-context` (contexto por requisição, só para a trilha de auditoria) • Swagger UI • bcrypt • AWS S3 (upload em stream) • pino • Vitest (integração com Postgres descartável) • ESLint + Prettier + Husky + lint-staged • Docker Compose (Postgres).
+Node 22+ (ESM) • Fastify 5 • TypeScript strict • Zod 4 + `fastify-type-provider-zod` (um schema gera validação, tipo, serialização e OpenAPI) • Prisma 7 (PostgreSQL via driver adapter `pg`) • JWT em cookie HTTP-only (web) ou `Authorization: Bearer` (app nativo) • `@fastify/request-context` (contexto por requisição, só para a trilha de auditoria) • Swagger UI • bcrypt • AWS S3 (upload em stream) • pino • Vitest (unit sem banco e integração com Postgres descartável) • ESLint + Prettier + Husky + lint-staged • Docker Compose (Postgres).
 
 ---
 
@@ -243,7 +243,8 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 | `npm run format`         | Prettier (escrita)                                                 |
 | `npm run format:check`   | Prettier (só confere; roda no `check`, no `pre-push` e no CI)      |
 | `npm run typecheck`      | `tsc --noEmit`                                                     |
-| `npm test`               | Vitest run (precisa do Postgres)                                   |
+| `npm test`               | Vitest run: projetos `unit` e `integration` (precisa do Postgres)  |
+| `npm run test:related`   | Só os testes afetados pelas mudanças não commitadas (`vitest run --changed`) |
 | `npm run test:watch`     | Vitest watch                                                       |
 | `npm run check`          | Lint + `format:check` + typecheck + test                           |
 | `npm run db:up` / `db:down` | Sobe/derruba o Postgres do compose                              |

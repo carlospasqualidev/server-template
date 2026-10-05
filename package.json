@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:related": "vitest run --changed",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",

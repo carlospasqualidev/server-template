@@ -45,7 +45,8 @@ function toPermissionMetadata(definition: PermissionMetadata): PermissionMetadat
   };
 }
 
-function hasSameMetadata(current: PermissionMetadata, definition: PermissionMetadata): boolean {
+/** Mesmos metadados (o que a tela de cargos mostra). Também usada pelo reset dos testes para conferir o catálogo. */
+export function hasSameMetadata(current: PermissionMetadata, definition: PermissionMetadata): boolean {
   return (
     current.module === definition.module &&
     current.groupLabel === definition.groupLabel &&
@@ -64,7 +65,7 @@ function hasSameMetadata(current: PermissionMetadata, definition: PermissionMeta
  * Nunca devolve a um cargo uma permissão que já existia e foi retirada dele: a composição de um cargo existente é
  * da empresa, não da sincronização.
  *
- * Roda na subida do servidor (antes do `listen`, depois do `prisma migrate deploy`), no seed e antes de cada teste.
+ * Roda na subida do servidor (antes do `listen`, depois do `prisma migrate deploy`), no seed e no reset dos testes (quando o catálogo do banco diverge do código).
  * Execuções simultâneas (várias instâncias subindo, seed com a suíte) se serializam pela trava consultiva do início
  * da transação: quem chega depois espera a anterior confirmar e já enxerga o que ela gravou.
  */

@@ -3,7 +3,7 @@
  * Funções puras; quem conecta, cria e apaga é o `globalSetup`.
  */
 
-/** Prefixo dos bancos temporários. TRUNCATE e DROP só rodam em banco com este prefixo. */
+/** Prefixo dos bancos temporários. O reset do `setup.ts` e o DROP só rodam em banco com este prefixo. */
 export const TEMPORARY_DATABASE_PREFIX = "temporary-int-";
 
 /** Banco temporário mais velho que isto é órfão (execução morta sem teardown) e é apagado no início da próxima. */
@@ -137,7 +137,7 @@ export function isOrphanTemporaryDatabase(databaseName: string, now: Date): bool
   return createdAt !== null && now.getTime() - createdAt.getTime() > ORPHAN_MAX_AGE_MS;
 }
 
-/** Trava antes de TRUNCATE e DROP. */
+/** Trava antes do reset do `setup.ts` e do DROP. */
 export function assertTemporaryDatabase(databaseName: string): void {
   if (!databaseName.startsWith(TEMPORARY_DATABASE_PREFIX)) {
     throw new Error(

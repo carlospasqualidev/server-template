@@ -12,7 +12,7 @@ As regras para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](CLAUDE
 - Sessão: JWT em cookie HTTP-only (`token`) para a web, ou em `Authorization: Bearer` para o app nativo, bcrypt para senha, rate limit no login e na troca da própria senha
 - Upload: streaming para AWS S3 (`@aws-sdk/lib-storage`)
 - Logs: pino (pretty em dev, JSON em produção)
-- Testes: Vitest + `app.inject()` contra um Postgres local, num banco temporário por execução
+- Testes: Vitest em dois projetos, unit (sem banco, em paralelo) e integração (`app.inject()` contra um Postgres local, num banco temporário por execução)
 - Qualidade: ESLint (camadas, imports, segurança), Prettier, Husky + lint-staged, GitHub Actions
 
 ## Requisitos
@@ -50,6 +50,7 @@ Se a porta 5432 já estiver ocupada na sua máquina: `POSTGRES_PORT=5433 npm run
 | `npm run format:check`            | Prettier (só confere)                               |
 | `npm run typecheck`               | `tsc --noEmit`                                      |
 | `npm test` / `npm run test:watch` | Vitest (precisa do Postgres no ar)                  |
+| `npm run test:related`            | Só os testes afetados pelas mudanças não commitadas |
 | `npm run check`                   | Lint + format:check + typecheck + test              |
 | `npm run db:up` / `db:down`       | Sobe / derruba o Postgres do compose                |
 | `npm run db:migrate -- --name x`  | Cria e aplica uma migration (dev)                   |
@@ -122,7 +123,7 @@ Formato de erro: `{ message, details?, issues? }`. Erro de validação traz `iss
 
 ## Permissões
 
-Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e antes de cada teste; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. O register espera uma sincronização em andamento antes de criar o `Administrador` da empresa nova, para ele nascer com o catálogo completo.
+Controle de acesso por cargo: o catálogo de permissões (`src/modules/permissions/permission.catalog.ts`) é global; os cargos são de cada empresa. Toda empresa nasce com o cargo `Administrador`, que tem o catálogo inteiro. As permissões efetivas do usuário (união dos seus cargos) vêm em `user.permissions` no login, no register e em `/users/me`, e são relidas do banco a cada requisição. O catálogo chega ao banco por uma sincronização idempotente que roda na subida do servidor (antes de aceitar requisição), no `npm run db:seed` e no reset dos testes; várias instâncias subindo juntas se revezam por uma trava no banco. Em produção ela exige o schema em dia: rode `npx prisma migrate deploy` antes de subir a versão nova, ou a subida falha com `Falha ao sincronizar o catálogo de permissões`. O register espera uma sincronização em andamento antes de criar o `Administrador` da empresa nova, para ele nascer com o catálogo completo.
 
 Os cargos são geridos pelas rotas `/roles`: cada cargo recebe permissões do catálogo (qualquer escrita de um grupo inclui a leitura do mesmo grupo) e usuários. O cargo `Administrador` não é editado, excluído nem copiado; a empresa nunca fica sem um administrador ativo; ninguém altera os próprios cargos; e ninguém concede a um cargo, ou atribui a alguém, permissão que não possui (o `Administrador` só é dado ou tirado por outro administrador). Regras, passo a passo para uma permissão nova e a gestão de cargos: [`docs/conventions.md`](docs/conventions.md#permissões-e-cargos).
 
@@ -172,7 +173,7 @@ src/
     systemConfigs/  configurações por empresa: catálogo no código, leitura, gravação em lote, timeout de inatividade
     audit/          trilha de auditoria: gravação nas mutações e exportações, frases, lista com busca, detalhe, opções e retenção
   scripts/          linha de comando compilada com a app (retenção da auditoria sob demanda)
-  tests/            suíte de integração (helpers, factories, setup do banco)
+  tests/            suíte unit e de integração (helpers, factories, setup do banco)
 prisma/             schema, migrations, seed
 docs/openapi.json   contrato exportado
 ```
@@ -181,7 +182,7 @@ Cada módulo segue `routes → controllers → services → prisma`, com um arqu
 
 ## Testes
 
-A suíte é de integração real: sobe a aplicação com `app.inject()` (sem porta) e fala com um banco temporário `temporary-int-<carimbo>-<aleatório>`, criado e migrado pelo `globalSetup` e apagado no fim da execução, verde ou vermelha. Cada teste começa com as tabelas truncadas; o S3 é mockado.
+A suíte tem dois projetos do Vitest. Os testes de integração (`*.test.ts`) sobem a aplicação com `app.inject()` (sem porta) e falam com um banco temporário `temporary-int-<carimbo>-<aleatório>`, criado e migrado pelo `globalSetup` e apagado no fim da execução, verde ou vermelha; cada teste começa com as tabelas de negócio vazias e o catálogo de permissões em dia, e o S3 é mockado. Os unit (`*.unit.test.ts`) não tocam banco e rodam em paralelo. `npm run test:related` roda só os testes afetados pelas mudanças não commitadas. Detalhes em [`docs/testing-guide.md`](docs/testing-guide.md).
 
 ```bash
 npm run db:up
