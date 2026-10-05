@@ -34,14 +34,14 @@ src/
 │   └── <módulo>.select.ts  # (opcional) selects Prisma compartilhados pelo módulo
 ├── scripts/                # linha de comando compilada com a app (roda também na imagem): runAuditRetention.ts
 ├── generated/prisma/       # client gerado (gitignored)
+├── types/                  # augment de tipos: fastify.d.ts (request.user), requestContext.d.ts (metadados da trilha de auditoria)
 └── tests/                  # ver docs/testing-guide.md
 prisma/
 ├── schema.prisma · migrations/ · seed.ts
 scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
 docs/openapi.json           # contrato gerado; commitado
+tsconfig.build.json         # build de produção (npm run build): só src/, sem src/tests
 ```
-
-> Verificar: possivelmente desatualizado — a árvore não lista `src/types/` (`src/types/fastify.d.ts`, `src/types/requestContext.d.ts`) nem o `tsconfig.build.json` usado pelo build (`package.json:13`).
 
 Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência e o autoatendimento em `/users/me`: perfil e troca da própria senha), `upload` (arquivo → S3), `audit` (trilha de auditoria: gravação pelas mutações e exportações, frases por entidade, rótulos de campo e de→para legível, lista com busca por conteúdo, detalhe, linha do tempo de um registro, opções de filtro e retenção: anonimizar e depois apagar, por empresa, e anonimização de um titular), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
 
@@ -66,16 +66,14 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 | `npm run db:deploy`      | Aplica migrations pendentes (CI/produção)                          |
 | `npm run db:seed`        | Sincroniza o catálogo de permissões e popula `admin@admin.com` / `123123123` (Administrador) |
 | `npm run db:generate`    | Gera o client do Prisma                                            |
+| `npm run db:reset`       | Apaga o banco do `.env` e reaplica as migrations (`prisma migrate reset`). **Destrutivo**: só com aval (`docs/guardrails.md`) |
 | `npm run db:studio`      | Prisma Studio                                                      |
 | `npm run openapi:export` | Grava `docs/openapi.json`                                          |
 | `npm run audit:retention` | Uma execução da retenção da trilha de auditoria (mesma trava do agendamento do servidor) |
 | `npm run clean`          | Remove `dist/`, `coverage/` e o client gerado                      |
 
-> Verificar: possivelmente desatualizado — a tabela não traz `db:reset` (`prisma migrate reset`, `package.json:29`), que `docs/guardrails.md:12` cita como destrutivo.
-
 ## Ambiente
 
-- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte segue o mesmo servidor (se for local).
-  > Verificar: possivelmente desatualizado — "a suíte segue o mesmo servidor (se for local)" está incompleto: a ordem real é `TEST_DATABASE_URL`, depois o `DATABASE_URL` do `.env` se for local, depois o padrão (`src/tests/testDatabase.ts:70`).
+- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte usa `TEST_DATABASE_URL`, se houver, senão o `DATABASE_URL` do `.env` (se for local), senão o Postgres padrão (`src/tests/testDatabase.ts`).
 - bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
 - A imagem de runtime instala com `npm ci --omit=dev --omit=optional` (sem o CLI do Prisma nem o TypeScript, que o lockfile marca `devOptional`); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.

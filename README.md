@@ -2,7 +2,7 @@
 
 API REST em Fastify 5 + Prisma 7 + Zod 4, com sessão por cookie HTTP-only na web e por `Authorization: Bearer` no app nativo, upload para S3, OpenAPI gerado dos schemas e suíte de integração contra um Postgres descartável. É o backend dos templates irmãos `frontend-template` (web) e `app-template` (mobile).
 
-As regras para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](CLAUDE.md), que vale para toda tarefa, e nos guias de [`docs/`](docs) que ele aponta (Guias de referência): convenções por assunto, testes, Definition of Done e guardrails. Este README cobre stack, como rodar e a estrutura.
+As regras para quem desenvolve (humano ou agente) estão em [`CLAUDE.md`](CLAUDE.md), que vale para toda tarefa, e nos guias de [`docs/`](docs) que ele aponta (Guias de referência): convenções por assunto, testes, Definition of Done e guardrails; o detalhe de área do próprio `CLAUDE.md` (segurança e HTTP, banco e desempenho, estrutura e ambiente) fica em [`docs/claude/`](docs/claude). Este README cobre stack, como rodar e a estrutura.
 
 ## Stack
 

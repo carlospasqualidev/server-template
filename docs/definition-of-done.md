@@ -22,7 +22,7 @@ Escopado no que a mudança tocou. Tudo verde antes de passar adiante; erro que n
 **SEMPRE** que você mexer em algo que impacte o **funcionamento** ou o **contrato** da API (rota nova, campo novo, mudança de formato, regra, mensagem visível), **atualize a documentação correspondente na mesma mudança**. Documentação divergente do código é pior que documentação inexistente.
 
 - **Contrato HTTP** → os schemas Zod da rota são a doc. Preencha `summary`, `description`, `tags` e `describe()` nos campos. Depois rode `npm run openapi:export` e commite [`docs/openapi.json`](openapi.json) atualizado: o frontend e o app leem esse arquivo.
-- **Convenção que vai se repetir → registre no `CLAUDE.md` (regra geral) ou no guia de `docs/` do assunto.**
+- **Convenção que vai se repetir → registre onde manda a seção [Onde registrar convenção nova](../CLAUDE.md#onde-registrar-convenção-nova) do `CLAUDE.md`.**
 - **Como rodar, script novo, variável de ambiente nova → `README.md`** e `.env.example`.
 - Só é dispensável quando a mudança **não afeta o uso** (refactor interno, teste, tooling).
 

@@ -1,6 +1,6 @@
 # Convenções do projeto
 
-Guia de referência movido do `CLAUDE.md`: leia a seção do assunto antes de criar ou mexer em import entre camadas, endpoint, formato de resposta, listagem, sessão, permissão ou cargo, configuração de sistema, auditoria, entidade ou migration do Prisma, variável de ambiente, upload, contrato com os clientes ou OpenAPI (a tabela **Guias de referência** do [`CLAUDE.md`](../CLAUDE.md#guias-de-referência) diz quando ler cada uma). As regras gerais (stack, linguagem, TypeScript, qualidade, error handling, segurança, performance, git, estrutura, scripts, ambiente, datas) continuam no `CLAUDE.md`.
+Guia de referência movido do `CLAUDE.md`: leia a seção do assunto antes de criar ou mexer em import entre camadas, endpoint, formato de resposta, listagem, sessão, permissão ou cargo, configuração de sistema, auditoria, entidade ou migration do Prisma, variável de ambiente, upload, contrato com os clientes ou OpenAPI (a tabela **Guias de referência** do [`CLAUDE.md`](../CLAUDE.md#guias-de-referência) diz quando ler cada uma). As regras gerais (stack, linguagem, TypeScript, qualidade, error handling, segurança, performance, git, estrutura, scripts, ambiente, datas) continuam no `CLAUDE.md`; o detalhe de estrutura, scripts e ambiente (árvore de pastas, tabela completa de scripts, Docker) está em [`claude/estrutura-e-ambiente.md`](claude/estrutura-e-ambiente.md), com a versão curta no `CLAUDE.md`.
 
 ## Imports
 
