@@ -1,7 +1,7 @@
 // Primeiro import: aponta DATABASE_URL para o banco temporário antes de `@/lib/prisma` carregar o ambiente.
 import "@/tests/temporaryDatabaseEnv";
 
-import { afterAll, beforeEach } from "vitest";
+import { beforeEach } from "vitest";
 
 import { env } from "@/config/env";
 import { prisma } from "@/lib/prisma";
@@ -69,8 +69,4 @@ export async function resetDatabase(): Promise<void> {
 
 beforeEach(async () => {
   await resetDatabase();
-});
-
-afterAll(async () => {
-  await prisma.$disconnect();
 });

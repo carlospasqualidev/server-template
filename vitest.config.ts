@@ -31,6 +31,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
+          sequence: { groupOrder: 1 },
           include: [UNIT_TEST_FILES],
           // Sem banco: nem banco temporário nem reset, e os arquivos rodam em paralelo. A URL aponta para uma porta
           // fechada: teste unit que consultar o banco falha na hora, em vez de passar por acaso.
@@ -47,6 +48,13 @@ export default defineConfig({
           setupFiles: ["./src/tests/setup.ts"],
           // Um banco temporário por execução, compartilhado pelos arquivos: eles rodam em sequência para não interferirem.
           fileParallelism: false,
+          // Arquivos em série (`fileParallelism: false`), então o grafo de módulos não precisa ser recriado por arquivo: o app e o client do
+          // Prisma carregam uma vez só (o import era ~1/3 do tempo). Cada arquivo restaura os próprios mocks, spies e
+          // timers (`restoreMocks` na raiz; timers falsos voltam ao real no `afterEach`) e não pode deixar estado em
+          // módulo. O `app.close()` de cada arquivo desconecta o Prisma (`onClose`) e o client reconecta sozinho.
+          isolate: false,
+          // Com `isolate: false` a integração sai do grupo sequencial implícito e fica com `maxWorkers` diferente do unit (1 contra N); o Vitest lança erro se os dois projetos têm o mesmo `groupOrder`. A ordem segue a de antes: unit, depois integração.
+          sequence: { groupOrder: 2 },
         },
       },
     ],
