@@ -1,6 +1,6 @@
 # Guia de testes
 
-Guia de referência movido do `CLAUDE.md`: leia antes de escrever ou mudar teste, factory ou helper de `src/tests/`, e antes de mexer no banco de teste. O que torna a tarefa e a entrega prontas (comandos do loop, testes que a tarefa exige, fechamento com `npm run check`, placar) está em [`definition-of-done.md`](definition-of-done.md).
+Guia de referência movido do `CLAUDE.md`: leia antes de escrever ou mudar teste, factory ou helper de `src/tests/`, e antes de mexer no banco de teste. O que torna a tarefa e a entrega prontas (comandos do loop, testes que a tarefa exige, fechamento com `pnpm run check`, placar) está em [`definition-of-done.md`](definition-of-done.md).
 
 ## Dois projetos: unit e integração
 
@@ -13,8 +13,8 @@ O `vitest.config.ts` tem dois projetos, e **o nome do arquivo decide** em qual c
 
 - **Regra**: teste que não consulta o banco, nem pelo que importa e executa, é `<nome>.unit.test.ts` (função pura, schema Zod, `loadEnv(source)`, catálogo em código, `buildApp()` com `inject()` em rota que não lê o banco). O resto é `<nome>.test.ts`. Na dúvida, `.test.ts`: o projeto de integração roda qualquer teste, só mais devagar.
 - No `unit`, o `DATABASE_URL` aponta para uma porta fechada (`UNIT_TEST_DATABASE_URL`, em `src/tests/testEnv.ts`): teste unit que consultar o banco falha com conexão recusada em vez de passar por acaso. Renomeie-o para `.test.ts`.
-- `npm test` roda os dois projetos (primeiro o unit, depois a integração: `sequence.groupOrder`: com `isolate: false` os dois projetos têm `maxWorkers` diferentes e o Vitest exige ordem distinta); `npx vitest run --project unit` roda só os unit.
-- Rodar só arquivos unit (`npx vitest run src/tests/lib/format/mask.unit.test.ts`) não cria banco: o `globalSetup` é do projeto de integração e só roda quando a execução tem arquivo dele.
+- `pnpm test` roda os dois projetos (primeiro o unit, depois a integração: `sequence.groupOrder`: com `isolate: false` os dois projetos têm `maxWorkers` diferentes e o Vitest exige ordem distinta); `pnpm exec vitest run --project unit` roda só os unit.
+- Rodar só arquivos unit (`pnpm exec vitest run src/tests/lib/format/mask.unit.test.ts`) não cria banco: o `globalSetup` é do projeto de integração e só roda quando a execução tem arquivo dele.
 
 ## Banco de teste (projeto de integração)
 
@@ -25,20 +25,20 @@ Integração real com Vitest + `app.inject()` contra um Postgres descartável. S
   - As tabelas de negócio (`BUSINESS_TABLES`) são esvaziadas com `DELETE`, filha antes da mãe, num comando só: ~3 ms por teste, contra ~40 ms do reset anterior (`TRUNCATE` das 8 tabelas e sincronização do catálogo). **Tabela nova entra em `BUSINESS_TABLES`, antes das tabelas que ela referencia.** Esquecida, o `DELETE` da tabela mãe falha por FK no teste seguinte, em vez de vazar dado entre testes.
   - O catálogo (`permissions`) não é apagado a cada teste: o reset o confere (uma leitura, ~1 ms) e só o refaz do zero (apaga e roda `syncPermissionCatalogService()`) quando ele diverge do código: no primeiro teste da execução, com o banco recém-migrado, ou depois de um teste que o alterou de propósito (sincronização com catálogo próprio, permissão criada, apagada ou com metadado trocado). Teste que mexe no catálogo não precisa restaurá-lo.
   - Prova em `src/tests/config/resetDatabase.test.ts`.
-- Os arquivos de integração rodam em série, num banco só, e são quase todo o tempo do `npm test`. Paralelizá-los (um banco por worker) é o próximo passo se a suíte voltar a pesar.
+- Os arquivos de integração rodam em série, num banco só, e são quase todo o tempo do `pnpm test`. Paralelizá-los (um banco por worker) é o próximo passo se a suíte voltar a pesar.
 - **`isolate: false` na integração**: os arquivos rodam em série num processo só, então o grafo de módulos (app, Prisma) carrega uma vez para a execução inteira, em vez de por arquivo (o import era ~1/3 do tempo). Em troca, cada arquivo restaura o que mexe: spy e mock voltam sozinhos (`restoreMocks`), timer falso volta ao real no `afterEach`, e nada de estado em variável de módulo ou em `process.env` sem restaurar. O `app.close()` de cada arquivo já desconecta o Prisma (`onClose`) e o client reconecta sozinho.
-- **Rodar um conjunto**: arquivos e `-t` na mesma invocação (`npx vitest run src/tests/modules/users src/tests/modules/roles -t "cargo"`), nunca um laço por arquivo: cada invocação com arquivo de integração paga o `globalSetup` (cria o banco e roda `migrate deploy`). `--retry` e repetição só no teste que pede, nunca na camada inteira.
+- **Rodar um conjunto**: arquivos e `-t` na mesma invocação (`pnpm exec vitest run src/tests/modules/users src/tests/modules/roles -t "cargo"`), nunca um laço por arquivo: cada invocação com arquivo de integração paga o `globalSetup` (cria o banco e roda `migrate deploy`). `--retry` e repetição só no teste que pede, nunca na camada inteira.
 - **Só Postgres local**: o servidor vem de `TEST_DATABASE_URL` (CI), senão do `DATABASE_URL` do arquivo `.env`, senão `localhost:5432` (o do compose); o nome do banco da URL é ignorado. A URL final é recusada, antes de qualquer conexão, se o host não for `localhost`, `127.0.0.1` ou `::1` (o nome `postgres` do compose também é recusado: fora da rede do compose ele pode resolver para um servidor remoto), ou se tiver `?host=`/`?hostaddr=`. Sem flag de escape. Um `.env` remoto (RDS) é ignorado com aviso de uma linha e a suíte cai no `localhost:5432`. Regras e testes em `src/tests/testDatabase.ts` e `src/tests/config/testDatabase.unit.test.ts`.
 - Ambiente sintético em `src/tests/testEnv.ts`: independente do `.env` local; o `DATABASE_URL` do shell é ignorado de propósito.
 - O `migrate deploy` por execução custa ~1,5 s nesta suíte; banco-modelo (`CREATE DATABASE ... TEMPLATE`) só vale a pena se passar de ~10 s.
 
-## Testes relacionados: `npm run test:related`
+## Testes relacionados: `pnpm run test:related`
 
-`npm run test:related` (`vitest run --changed`) é o comando padrão do loop por tarefa (ver [`definition-of-done.md`](definition-of-done.md#loop-por-tarefa)). Ele pega pelo git os arquivos alterados e não commitados (os novos, não rastreados, inclusive) e segue o grafo de imports de cada projeto: roda os testes desses arquivos e os de quem os importa, direta ou indiretamente, unit e integração. Mexer em `src/lib/format/mask.ts` roda só `mask.unit.test.ts`; mexer em `src/lib/audit/auditRetention.ts` roda o teste unit dele e o de integração da retenção, que o importa pelo service.
+`pnpm run test:related` (`vitest run --changed`) é o comando padrão do loop por tarefa (ver [`definition-of-done.md`](definition-of-done.md#loop-por-tarefa)). Ele pega pelo git os arquivos alterados e não commitados (os novos, não rastreados, inclusive) e segue o grafo de imports de cada projeto: roda os testes desses arquivos e os de quem os importa, direta ou indiretamente, unit e integração. Mexer em `src/lib/format/mask.ts` roda só `mask.unit.test.ts`; mexer em `src/lib/audit/auditRetention.ts` roda o teste unit dele e o de integração da retenção, que o importa pelo service.
 
 - **Roda a suíte inteira** quando muda `vitest.config.ts`, um `package.json`, `prisma/schema.prisma`, uma migration (`prisma/migrations/`) ou um arquivo da raiz de `src/tests/` (`setup.ts`, `globalSetup.ts`, `testEnv.ts`, `testDatabase.ts`, `temporaryDatabaseEnv.ts`): é o `forceRerunTriggers` do `vitest.config.ts`. Schema e migration não estão no grafo de imports: sem a regra, mudança só de banco rodaria 0 testes. Arquivo novo na raiz de `src/tests/` entra na regra sozinho.
-- **Sem mudança não commitada**, não roda nada: sai com exit 0 e `No test files found, exiting with code 0`. Isso não é verde nem placar. Depois do commit, use `npx vitest related --run <arquivos>`, que segue o mesmo grafo a partir dos arquivos dados.
-- Funciona igual no PowerShell e no Git Bash. Para iterar num teste só, `npx vitest run <caminho>` e `npx vitest run -t "<nome do teste>"` continuam valendo.
+- **Sem mudança não commitada**, não roda nada: sai com exit 0 e `No test files found, exiting with code 0`. Isso não é verde nem placar. Depois do commit, use `pnpm exec vitest related --run <arquivos>`, que segue o mesmo grafo a partir dos arquivos dados.
+- Funciona igual no PowerShell e no Git Bash. Para iterar num teste só, `pnpm exec vitest run <caminho>` e `pnpm exec vitest run -t "<nome do teste>"` continuam valendo.
 
 ## Organização dos arquivos
 

@@ -2,7 +2,8 @@ node_modules
 dist
 coverage
 src/generated
-package-lock.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
 docs/openapi.json
 # Docs formatados a mao
 CLAUDE.md

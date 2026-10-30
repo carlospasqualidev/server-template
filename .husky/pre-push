@@ -1,1 +1,1 @@
-npm run format:check && npm run typecheck && npm test
+pnpm run format:check && pnpm run typecheck && pnpm test

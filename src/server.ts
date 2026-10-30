@@ -66,7 +66,7 @@ async function runAuditRetention(signal: AbortSignal): Promise<void> {
 /**
  * Retenção diária da trilha de auditoria (anonimizar e depois apagar, pelos prazos de cada empresa), no horário fixo
  * `AUDIT_RETENTION_DAILY_RUN_UTC`. Toda instância agenda; a trava do service deixa uma só trabalhar. Desligada por
- * `AUDIT_RETENTION_ENABLED=false` (ex.: quando um cron externo roda `npm run audit:retention`) e sempre em teste. O
+ * `AUDIT_RETENTION_ENABLED=false` (ex.: quando um cron externo roda `pnpm run audit:retention`) e sempre em teste. O
  * encerramento (`onClose`) cancela o agendamento e espera a execução em curso terminar o lote, até
  * `AUDIT_RETENTION_SHUTDOWN_WAIT_MS`, antes de o banco ser desconectado. Chamada antes do `listen`, porque depois dele o
  * Fastify não aceita hook, mas o timer só é armado quando o servidor passa a escutar (`onListen`): se o `listen` falhar,

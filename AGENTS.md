@@ -5,5 +5,5 @@ As instruções para agentes de código (Claude Code, Codex e afins) estão em [
 Atalhos:
 
 - Como rodar, scripts e variáveis de ambiente: [`README.md`](README.md).
-- Contrato HTTP atual, gerado dos schemas Zod: [`docs/openapi.json`](docs/openapi.json) (regenere com `npm run openapi:export`).
+- Contrato HTTP atual, gerado dos schemas Zod: [`docs/openapi.json`](docs/openapi.json) (regenere com `pnpm run openapi:export`).
 - Módulo de referência para CRUD: `src/modules/users/`.

@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { runAuditRetentionService } from "@/modules/audit/services/runAuditRetention.service";
 
 /**
- * Uma execução da retenção da trilha de auditoria, sob demanda ou por um cron externo: `npm run audit:retention` em
+ * Uma execução da retenção da trilha de auditoria, sob demanda ou por um cron externo: `pnpm run audit:retention` em
  * desenvolvimento, `node dist/scripts/runAuditRetention.js` na imagem de produção. Mesma trava do agendamento do
  * servidor: com outra execução em andamento, sai sem fazer nada. Passado o tempo de trabalho, para entre dois lotes e
  * avisa (a próxima execução continua de onde esta parou). Falha sai com código 1.

@@ -38,9 +38,9 @@ src/
 └── tests/                  # ver docs/testing-guide.md
 prisma/
 ├── schema.prisma · migrations/ · seed.ts
-scripts/exportOpenApi.ts    # npm run openapi:export → docs/openapi.json
+scripts/exportOpenApi.ts    # pnpm run openapi:export → docs/openapi.json
 docs/openapi.json           # contrato gerado; commitado
-tsconfig.build.json         # build de produção (npm run build): só src/, sem src/tests
+tsconfig.build.json         # build de produção (pnpm run build): só src/, sem src/tests
 ```
 
 Módulos atuais: `health` (liveness/readiness), `session` (login, register, logout), `users` (CRUD de referência e o autoatendimento em `/users/me`: perfil e troca da própria senha), `upload` (arquivo → S3), `audit` (trilha de auditoria: gravação pelas mutações e exportações, frases por entidade, rótulos de campo e de→para legível, lista com busca por conteúdo, detalhe, linha do tempo de um registro, opções de filtro e retenção: anonimizar e depois apagar, por empresa, e anonimização de um titular), `permissions` (catálogo, sincronização, cargo `Administrador`, permissões efetivas, anti-escalonamento, invariante do último administrador e a trava dela; sem rotas), `roles` (gestão de cargos: catálogo agrupado, CRUD, cópia, usuários do cargo), `systemConfigs` (configurações de sistema por empresa: catálogo no código, leitura, gravação em lote, leitura tipada e a cascata do timeout de inatividade).
@@ -50,30 +50,30 @@ Módulos atuais: `health` (liveness/readiness), `session` (login, register, logo
 <!-- prettier-ignore -->
 | Script                   | O que faz                                                          |
 | ------------------------ | ------------------------------------------------------------------ |
-| `npm run dev`            | API com `tsx` em watch, `.env` carregado pelo Node                 |
-| `npm run build`          | `tsc` + `tsc-alias` → `dist/` (ESM com extensões e alias resolvidos) |
+| `pnpm run dev`            | API com `tsx` em watch, `.env` carregado pelo Node                 |
+| `pnpm run build`          | `tsc` + `tsc-alias` → `dist/` (ESM com extensões e alias resolvidos) |
 | `npm start`              | Roda `dist/server.js`                                              |
-| `npm run lint`           | ESLint (camadas, imports, segurança)                               |
-| `npm run format`         | Prettier (escrita)                                                 |
-| `npm run format:check`   | Prettier (só confere; roda no `check`, no `pre-push` e no CI)      |
-| `npm run typecheck`      | `tsc --noEmit`                                                     |
-| `npm test`               | Vitest run: projetos `unit` e `integration` (precisa do Postgres)  |
-| `npm run test:related`   | Só os testes afetados pelas mudanças não commitadas (`vitest run --changed`) |
-| `npm run test:watch`     | Vitest watch                                                       |
-| `npm run check`          | Lint + `format:check` + typecheck + test                           |
-| `npm run db:up` / `db:down` | Sobe/derruba o Postgres do compose                              |
-| `npm run db:migrate -- --name x` | Cria e aplica migration em dev                             |
-| `npm run db:deploy`      | Aplica migrations pendentes (CI/produção)                          |
-| `npm run db:seed`        | Sincroniza o catálogo de permissões e popula `admin@admin.com` / `123123123` (Administrador) |
-| `npm run db:generate`    | Gera o client do Prisma                                            |
-| `npm run db:reset`       | Apaga o banco do `.env` e reaplica as migrations (`prisma migrate reset`). **Destrutivo**: só com aval (`docs/guardrails.md`) |
-| `npm run db:studio`      | Prisma Studio                                                      |
-| `npm run openapi:export` | Grava `docs/openapi.json`                                          |
-| `npm run audit:retention` | Uma execução da retenção da trilha de auditoria (mesma trava do agendamento do servidor) |
-| `npm run clean`          | Remove `dist/`, `coverage/` e o client gerado                      |
+| `pnpm run lint`           | ESLint (camadas, imports, segurança)                               |
+| `pnpm run format`         | Prettier (escrita)                                                 |
+| `pnpm run format:check`   | Prettier (só confere; roda no `check`, no `pre-push` e no CI)      |
+| `pnpm run typecheck`      | `tsc --noEmit`                                                     |
+| `pnpm test`               | Vitest run: projetos `unit` e `integration` (precisa do Postgres)  |
+| `pnpm run test:related`   | Só os testes afetados pelas mudanças não commitadas (`vitest run --changed`) |
+| `pnpm run test:watch`     | Vitest watch                                                       |
+| `pnpm run check`          | Lint + `format:check` + typecheck + test                           |
+| `pnpm run db:up` / `db:down` | Sobe/derruba o Postgres do compose                              |
+| `pnpm run db:migrate -- --name x` | Cria e aplica migration em dev                             |
+| `pnpm run db:deploy`      | Aplica migrations pendentes (CI/produção)                          |
+| `pnpm run db:seed`        | Sincroniza o catálogo de permissões e popula `admin@admin.com` / `123123123` (Administrador) |
+| `pnpm run db:generate`    | Gera o client do Prisma                                            |
+| `pnpm run db:reset`       | Apaga o banco do `.env` e reaplica as migrations (`prisma migrate reset`). **Destrutivo**: só com aval (`docs/guardrails.md`) |
+| `pnpm run db:studio`      | Prisma Studio                                                      |
+| `pnpm run openapi:export` | Grava `docs/openapi.json`                                          |
+| `pnpm run audit:retention` | Uma execução da retenção da trilha de auditoria (mesma trava do agendamento do servidor) |
+| `pnpm run clean`          | Remove `dist/`, `coverage/` e o client gerado                      |
 
 ## Ambiente
 
-- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 npm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte usa `TEST_DATABASE_URL`, se houver, senão o `DATABASE_URL` do `.env` (se for local), senão o Postgres padrão (`src/tests/testDatabase.ts`).
+- Postgres via `docker compose` (porta `POSTGRES_PORT`, padrão 5432). Se a 5432 já estiver em uso, `POSTGRES_PORT=5433 pnpm run db:up` e ajuste `DATABASE_URL` no `.env`; a suíte usa `TEST_DATABASE_URL`, se houver, senão o `DATABASE_URL` do `.env` (se for local), senão o Postgres padrão (`src/tests/testDatabase.ts`).
 - bcrypt é módulo nativo: em Docker use imagem `node:22-slim` (glibc), já configurado no `Dockerfile`.
-- A imagem de runtime instala com `npm ci --omit=dev --omit=optional` (sem o CLI do Prisma nem o TypeScript, que o lockfile marca `devOptional`); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.
+- A imagem de runtime instala com `pnpm install --prod --no-optional --ignore-scripts` (sem devDependencies, como o CLI do Prisma e o TypeScript, nem optionalDependencies); as migrations rodam pela imagem do estágio `migrate`. Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário nessa imagem: suba o container para conferir.

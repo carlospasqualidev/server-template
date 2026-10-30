@@ -17,7 +17,7 @@ export default defineConfig({
     restoreMocks: true,
     testTimeout: 15_000,
     hookTimeout: 60_000,
-    // `vitest run --changed` (`npm run test:related`) roda tudo quando muda um destes. O `setupFiles` de um projeto não
+    // `vitest run --changed` (`pnpm run test:related`) roda tudo quando muda um destes. O `setupFiles` de um projeto não
     // entra sozinho na lista (só o da raiz), e os arquivos da raiz de `src/tests/` são a infraestrutura da suíte.
     // Schema e migrations não estão no grafo de imports: sem eles aqui, mudança só de banco rodaria 0 testes.
     forceRerunTriggers: [

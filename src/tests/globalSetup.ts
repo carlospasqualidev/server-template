@@ -97,7 +97,7 @@ export default async function globalSetup(project: TestProject): Promise<() => P
   const teardown = () => withMaintenanceClient(serverUrl, (client) => dropDatabase(client, databaseName));
 
   try {
-    execSync("npx prisma migrate deploy", {
+    execSync("pnpm exec prisma migrate deploy", {
       stdio: "inherit",
       env: { ...process.env, DATABASE_URL: databaseUrl },
     });

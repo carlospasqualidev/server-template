@@ -183,13 +183,13 @@ Um módulo por recurso de negócio em `src/modules/<módulo>/` (`<módulo>.route
 
 ## Scripts
 
-- Os do dia a dia: `npm run dev`, `npm run check` (lint + `format:check` + typecheck + test), `npm test` (precisa do Postgres), `npm run test:related`, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run db:up`, `npm run db:migrate -- --name x`, `npm run db:seed` e `npm run openapi:export`. A tabela completa, com o que cada script faz: detalhe em [`docs/claude/estrutura-e-ambiente.md`](docs/claude/estrutura-e-ambiente.md).
+- Os do dia a dia: `pnpm run dev`, `pnpm run check` (lint + `format:check` + typecheck + test), `pnpm test` (precisa do Postgres), `pnpm run test:related`, `pnpm run lint`, `pnpm run typecheck`, `pnpm run build`, `pnpm run db:up`, `pnpm run db:migrate -- --name x`, `pnpm run db:seed` e `pnpm run openapi:export`. A tabela completa, com o que cada script faz: detalhe em [`docs/claude/estrutura-e-ambiente.md`](docs/claude/estrutura-e-ambiente.md).
 
 ## Ambiente
 
 - Windows (PowerShell) no dia a dia. Em comandos shell use sintaxe PS (`$env:VAR`, sem `&&` em PS 5.1) — nos scripts npm, `&&` funciona porque roda no shell do npm.
 - Node >= 22.12 (`.nvmrc` = 22; CI roda em Node 22). `npm` com `package-lock.json`.
-- Postgres via `docker compose` (`npm run db:up`); porta ocupada, bcrypt nativo no Docker e a imagem de runtime sem dependências opcionais: detalhe em [`docs/claude/estrutura-e-ambiente.md`](docs/claude/estrutura-e-ambiente.md).
+- Postgres via `docker compose` (`pnpm run db:up`); porta ocupada, bcrypt nativo no Docker e a imagem de runtime sem dependências opcionais: detalhe em [`docs/claude/estrutura-e-ambiente.md`](docs/claude/estrutura-e-ambiente.md).
 - Dependência nova com binário nativo opcional (ex.: `sharp`) perde o binário na imagem de runtime: suba o container para conferir; detalhe em [`docs/claude/estrutura-e-ambiente.md`](docs/claude/estrutura-e-ambiente.md).
 
 ## 📅 Datas

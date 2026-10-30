@@ -10,7 +10,7 @@ import { getSystemConfigValueService } from "@/modules/systemConfigs/services/ge
 
 /**
  * Nome da trava consultiva da retenção (`hashtext` dele é a chave): uma execução por vez no banco, entre instâncias e
- * com o `npm run audit:retention`. Exportado para o teste tomar a mesma trava.
+ * com o `pnpm run audit:retention`. Exportado para o teste tomar a mesma trava.
  */
 export const AUDIT_RETENTION_LOCK_NAME = "audit-retention";
 

@@ -17,7 +17,7 @@ export interface PermissionDefinition {
 
 /**
  * Fonte única das permissões. Rota nova que precisa de permissão nova: acrescente aqui e rode a sincronização
- * (`npm run db:seed` em dev); ela cria a permissão e a concede só ao cargo `Administrador` de cada empresa.
+ * (`pnpm run db:seed` em dev); ela cria a permissão e a concede só ao cargo `Administrador` de cada empresa.
  * Não renomeie um `name` existente: mova o antigo para `OBSOLETE_PERMISSION_NAMES` e crie o novo.
  */
 export const PERMISSION_CATALOG = [
